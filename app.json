@@ -1,30 +1,25 @@
 {
   "expo": {
-    "name": "app-gdht",
-    "slug": "app-gdht",
+    "name": "Giáo dục Di sản",
+    "slug": "gdds-toanhoc",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/onboarding/step1.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
+    "scheme": "gdds-toanhoc",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.gdds.toanhoc"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "package": "com.gdds.toanhoc"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router"
+    ]
   }
 }
