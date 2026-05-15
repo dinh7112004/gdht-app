@@ -15,7 +15,22 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     loadSoundSetting();
+    setupAudioMode();
   }, []);
+
+  const setupAudioMode = async () => {
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        staysActiveInBackground: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+    } catch (e) {
+      console.error("Failed to setup audio mode", e);
+    }
+  };
 
   const loadSoundSetting = async () => {
     try {
@@ -38,20 +53,39 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const playSound = async (soundFile: any) => {
-    if (!soundEnabled) return;
+    if (!soundEnabled || !soundFile) return;
 
+    let soundInstance: Audio.Sound | null = null;
     try {
-      const { sound } = await Audio.Sound.createAsync(soundFile);
-      await sound.playAsync();
+      const { sound } = await Audio.Sound.createAsync(
+        soundFile,
+        { shouldPlay: true, volume: 1.0 },
+        null,
+        false // Do not download async for now
+      );
+      soundInstance = sound;
       
-      // Unload sound from memory after playing
       sound.setOnPlaybackStatusUpdate(async (status) => {
         if (status.isLoaded && status.didJustFinish) {
           await sound.unloadAsync();
         }
+        if (status.isLoaded && status.error) {
+          console.warn("Playback error:", status.error);
+          await sound.unloadAsync();
+        }
       });
+
+      await sound.playAsync();
     } catch (e) {
-      console.error("Failed to play sound", e);
+      // Quietly fail for network sounds
+      if (__DEV__) {
+        console.log("Sound play skipped or failed (likely network/URL issue):", e instanceof Error ? e.message : e);
+      }
+      if (soundInstance) {
+        try {
+          await (soundInstance as Audio.Sound).unloadAsync();
+        } catch (err) {}
+      }
     }
   };
 

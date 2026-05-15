@@ -20,26 +20,15 @@ export default function ExploreScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchData(activeFilter, searchQuery);
-    }, [activeFilter])
+      fetchData();
+    }, [])
   );
 
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      fetchData(activeFilter, searchQuery);
-    }, 500);
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
-
-  const fetchData = async (categoryFilter?: string, search?: string) => {
+  const fetchData = async () => {
     try {
-      let url = "/categories/for-student?";
-      if (categoryFilter && categoryFilter !== "Tất cả") url += `search=${categoryFilter}&`;
-      if (search) url += `search=${search}`;
-
       const [profileRes, catRes] = await Promise.all([
         client.get("/auth/profile"),
-        client.get(url)
+        client.get("/categories/for-student")
       ]);
       
       setUserData(profileRes.data);
@@ -53,15 +42,11 @@ export default function ExploreScreen() {
 
   const filters = ["Tất cả", ...new Set(categories.map(c => c.subject).filter(s => !!s))];
 
-  // Group categories by Subject
-  const groupedCategories = categories.reduce((acc: any, cat: any) => {
-    const subject = cat.subject || "Chương trình chung";
-    if (!acc[subject]) acc[subject] = [];
-    acc[subject].push(cat);
-    return acc;
-  }, {});
-
-  const subjectOrder = Object.keys(groupedCategories);
+  const displayedCategories = categories.filter((c: any) => {
+    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = activeFilter === "Tất cả" || (c.subject || "Chương trình chung") === activeFilter;
+    return matchesSearch && matchesFilter;
+  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -131,47 +116,27 @@ export default function ExploreScreen() {
           </View>
         ) : (
           <View style={styles.contentBody}>
-            {subjectOrder.map((subject) => {
-              // Nếu đang lọc theo môn học, chỉ hiện môn đó
-              if (activeFilter !== "Tất cả" && activeFilter !== subject) return null;
-              
-              const cats = groupedCategories[subject];
-              if (!cats || cats.length === 0) return null;
-
-              return (
-                <View key={subject} style={styles.subjectSection}>
-                  <View style={styles.sectionHeader}>
-                    <View style={styles.sectionTitleRow}>
-                      <View style={[styles.dot, { backgroundColor: subject === 'Toán học' ? '#3B82F6' : '#2E7D32' }]} />
-                      <Text style={styles.subjectTitle}>{subject}</Text>
+            <View style={styles.gridContainer}>
+              {displayedCategories.map((cat: any) => (
+                <TouchableOpacity 
+                  key={cat._id}
+                  style={styles.catCard} 
+                  onPress={() => router.push({ pathname: "/category/[id]", params: { id: cat._id, name: cat.name } })}
+                >
+                  <Image 
+                    source={{ uri: cat.imageUrl || "https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=400" }} 
+                    style={styles.catImg} 
+                  />
+                  <View style={styles.catInfo}>
+                    <Text style={styles.catTitle} numberOfLines={2}>{cat.name}</Text>
+                    <View style={styles.catMeta}>
+                      <Ionicons name="book-outline" size={14} color="#64748b" />
+                      <Text style={styles.catCount}>{cat.lessonCount || 0} bài học</Text>
                     </View>
-                    <Text style={styles.sectionCount}>{cats.length} chủ đề</Text>
                   </View>
-                  
-                  <View style={styles.gridContainer}>
-                    {cats.map((cat: any) => (
-                      <TouchableOpacity 
-                        key={cat._id}
-                        style={styles.catCard} 
-                        onPress={() => router.push({ pathname: "/category/[id]", params: { id: cat._id, name: cat.name } })}
-                      >
-                        <Image 
-                          source={{ uri: cat.imageUrl || "https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=400" }} 
-                          style={styles.catImg} 
-                        />
-                        <View style={styles.catInfo}>
-                          <Text style={styles.catTitle} numberOfLines={2}>{cat.name}</Text>
-                          <View style={styles.catMeta}>
-                            <Ionicons name="book-outline" size={14} color="#64748b" />
-                            <Text style={styles.catCount}>{cat.lessonCount || 0} bài học</Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              );
-            })}
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
         

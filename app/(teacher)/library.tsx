@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, useWindowDimensions, Dimensions, TextInput, ActivityIndicator, Alert, Modal } from "react-native";
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, useWindowDimensions, Dimensions, TextInput, ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import client, { BASE_URL } from "../../src/api/client";
+import client, { BASE_URL, resolveImageUrl } from "../../src/api/client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -41,6 +41,7 @@ export default function LibraryScreen() {
 function LibraryView() {
   const router = useRouter();
   const [categories, setCategories] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -55,7 +56,32 @@ function LibraryView() {
 
   useEffect(() => {
     fetchCategories();
+    fetchSubjects();
   }, []);
+
+  const fetchSubjects = async () => {
+    try {
+      const res = await client.get("/subjects");
+      if (res.data && res.data.length > 0) {
+        setSubjects(res.data);
+      } else {
+        // Fallback nếu chưa có data trong DB
+        setSubjects([
+          { name: "Toán học" }, { name: "Ngữ văn" }, { name: "Lịch sử" }, 
+          { name: "Địa lý" }, { name: "Khoa học" }, { name: "Tiếng Anh" }, 
+          { name: "Văn hóa" }, { name: "Nghệ thuật" }
+        ]);
+      }
+    } catch (error) {
+      console.error("Failed to fetch subjects", error);
+      // Fallback
+      setSubjects([
+        { name: "Toán học" }, { name: "Ngữ văn" }, { name: "Lịch sử" }, 
+        { name: "Địa lý" }, { name: "Khoa học" }, { name: "Tiếng Anh" }, 
+        { name: "Văn hóa" }, { name: "Nghệ thuật" }
+      ]);
+    }
+  };
 
   const fetchCategories = async () => {
     try {
@@ -70,7 +96,7 @@ function LibraryView() {
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [16, 9],
       quality: 1,
@@ -95,7 +121,11 @@ function LibraryView() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      setFormData({ ...formData, imageUrl: BASE_URL + res.data.url });
+      const imageUrl = res.data.url.startsWith('http') 
+        ? res.data.url 
+        : BASE_URL + res.data.url;
+
+      setFormData({ ...formData, imageUrl });
     } catch (error) {
       Alert.alert("Lỗi", "Không thể tải ảnh lên máy chủ");
     } finally {
@@ -155,6 +185,16 @@ function LibraryView() {
       ]
     );
   };
+
+  const handleToggleFeatured = async (cat: any) => {
+    try {
+      await client.put(`/categories/${cat._id}`, { isFeatured: !cat.isFeatured });
+      fetchCategories();
+    } catch (e) {
+      Alert.alert("Lỗi", "Không thể cập nhật trạng thái nổi bật");
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -180,7 +220,7 @@ function LibraryView() {
             style={styles.libraryCard}
             onPress={() => router.push({ pathname: "/category/[id]", params: { id: cat._id, name: cat.name } })}
           >
-            <Image source={{ uri: cat.imageUrl || "https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=400" }} style={styles.catImg} />
+            <Image source={{ uri: resolveImageUrl(cat.imageUrl) }} style={styles.catImg} />
             <View style={styles.catInfo}>
               <Text style={styles.catTitle}>{cat.name}</Text>
               <Text style={styles.catSub} numberOfLines={2}>{cat.description}</Text>
@@ -191,12 +231,24 @@ function LibraryView() {
                 >
                   <Text style={styles.previewBtnText}>Xem bài giảng</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.deleteActionBtn}
-                  onPress={() => handleDeleteCategory(cat._id)}
-                >
-                  <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity 
+                    style={{ padding: 8, backgroundColor: cat.isFeatured ? '#FFFBEB' : '#F8FAFC', borderRadius: 10, borderWidth: 1, borderColor: cat.isFeatured ? '#FEF9C3' : '#F1F5F9' }}
+                    onPress={() => handleToggleFeatured(cat)}
+                  >
+                    <Ionicons 
+                      name={cat.isFeatured ? "star" : "star-outline"} 
+                      size={20} 
+                      color={cat.isFeatured ? "#F59E0B" : "#94a3b8"} 
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.deleteActionBtn}
+                    onPress={() => handleDeleteCategory(cat._id)}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           </TouchableOpacity>
@@ -206,79 +258,84 @@ function LibraryView() {
       {/* Create Category Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Tạo chủ đề mới</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={28} color="#64748b" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Ảnh bìa chủ đề</Text>
-                <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
-                  {formData.imageUrl ? (
-                    <Image source={{ uri: formData.imageUrl }} style={styles.pickedImage} />
-                  ) : (
-                    <View style={styles.imagePlaceholder}>
-                      <Ionicons name="image-outline" size={40} color="#cbd5e1" />
-                      <Text style={styles.imagePlaceholderText}>Chọn ảnh từ thư viện</Text>
-                    </View>
-                  )}
-                  {submitting && (
-                    <View style={styles.uploadingOverlay}>
-                      <ActivityIndicator color="#fff" />
-                    </View>
-                  )}
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={{ width: '100%', justifyContent: 'flex-end' }}
+          >
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Tạo chủ đề mới</Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <Ionicons name="close" size={28} color="#64748b" />
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Tên chủ đề</Text>
-                <TextInput 
-                  style={styles.input}
-                  placeholder="Ví dụ: Di sản văn hóa"
-                  value={formData.name}
-                  onChangeText={(val) => setFormData({...formData, name: val})}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Môn học</Text>
-                <View style={styles.pickerContainer}>
-                  {["Toán học", "Lịch sử", "Địa lý", "Văn hóa"].map((s) => (
-                    <TouchableOpacity 
-                      key={s} 
-                      style={[styles.pickerItem, formData.subject === s && styles.pickerItemActive]}
-                      onPress={() => setFormData({...formData, subject: s})}
-                    >
-                      <Text style={[styles.pickerItemText, formData.subject === s && styles.pickerItemTextActive]}>{s}</Text>
-                    </TouchableOpacity>
-                  ))}
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={styles.formGroup}>
+                  <Text style={styles.inputLabel}>Ảnh bìa chủ đề</Text>
+                  <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
+                    {formData.imageUrl ? (
+                      <Image source={{ uri: resolveImageUrl(formData.imageUrl) }} style={styles.pickedImage} />
+                    ) : (
+                      <View style={styles.imagePlaceholder}>
+                        <Ionicons name="image-outline" size={40} color="#cbd5e1" />
+                        <Text style={styles.imagePlaceholderText}>Chọn ảnh từ thư viện</Text>
+                      </View>
+                    )}
+                    {submitting && (
+                      <View style={styles.uploadingOverlay}>
+                        <ActivityIndicator color="#fff" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
                 </View>
-              </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Mô tả</Text>
-                <TextInput 
-                  style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
-                  placeholder="Mô tả ngắn về chủ đề này..."
-                  multiline
-                  value={formData.description}
-                  onChangeText={(val) => setFormData({...formData, description: val})}
-                />
-              </View>
+                <View style={styles.formGroup}>
+                  <Text style={styles.inputLabel}>Tên chủ đề</Text>
+                  <TextInput 
+                    style={styles.input}
+                    placeholder="Ví dụ: Di sản văn hóa"
+                    value={formData.name}
+                    onChangeText={(val) => setFormData({...formData, name: val})}
+                  />
+                </View>
 
-              <TouchableOpacity 
-                style={[styles.submitBtn, submitting && { opacity: 0.7 }]} 
-                onPress={handleCreateCategory}
-                disabled={submitting}
-              >
-                {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Lưu chủ đề</Text>}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
+                <View style={styles.formGroup}>
+                  <Text style={styles.inputLabel}>Môn học</Text>
+                  <View style={styles.pickerContainer}>
+                    {subjects.map((s) => (
+                      <TouchableOpacity 
+                        key={s.name} 
+                        style={[styles.pickerItem, formData.subject === s.name && styles.pickerItemActive]}
+                        onPress={() => setFormData({...formData, subject: s.name})}
+                      >
+                        <Text style={[styles.pickerItemText, formData.subject === s.name && styles.pickerItemTextActive]}>{s.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.inputLabel}>Mô tả</Text>
+                  <TextInput 
+                    style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+                    placeholder="Mô tả ngắn về chủ đề này..."
+                    multiline
+                    value={formData.description}
+                    onChangeText={(val) => setFormData({...formData, description: val})}
+                  />
+                </View>
+
+                <TouchableOpacity 
+                  style={[styles.submitBtn, submitting && { opacity: 0.7 }]} 
+                  onPress={handleCreateCategory}
+                  disabled={submitting}
+                >
+                  {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Lưu chủ đề</Text>}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </View>
@@ -361,7 +418,8 @@ function AssignmentView() {
         description: notes || `Bài tập ôn tập được giao trực tiếp từ giáo viên.`,
         content: notes || `Chúc các em hoàn thành tốt bài tập này!`,
         category: catName,
-        imageUrl: cat?.imageUrl || "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=400",
+        categoryId: selectedCatId,
+        imageUrl: resolveImageUrl(cat?.imageUrl),
         xpReward: parseInt(xpReward) || 50,
         estimatedMinutes: parseInt(estimatedMinutes) || 10,
         difficulty: difficulty,
@@ -382,6 +440,11 @@ function AssignmentView() {
         categoryIds: [selectedCatId] 
       });
 
+      // 5. Giao trực tiếp bài học vừa tạo cho lớp (để đảm bảo bài học xuất hiện trong danh sách riêng)
+      await client.post(`/classes/${selectedClassId}/lessons`, { 
+        lessonId: lessonId 
+      });
+
       Alert.alert("Thành công", "Đã tạo bộ câu hỏi và giao bài tập thành công!");
       
       // Reset form
@@ -396,144 +459,150 @@ function AssignmentView() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent}>
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Chọn lớp học</Text>
-        <View style={styles.pickerContainer}>
-          {classes.map((c) => (
-            <TouchableOpacity 
-              key={c._id} 
-              style={[styles.pickerItem, selectedClassId === c._id && styles.pickerItemActive]}
-              onPress={() => setSelectedClassId(c._id)}
-            >
-              <Text style={[styles.pickerItemText, selectedClassId === c._id && styles.pickerItemTextActive]}>{c.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Chọn chủ đề bài học</Text>
-        <View style={styles.pickerContainer}>
-          {categories.map((cat) => (
-            <TouchableOpacity 
-              key={cat._id} 
-              style={[styles.pickerItem, selectedCatId === cat._id && styles.pickerItemActive]}
-              onPress={() => setSelectedCatId(cat._id)}
-            >
-              <Text style={[styles.pickerItemText, selectedCatId === cat._id && styles.pickerItemTextActive]}>{cat.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.quizSection}>
-        <View style={styles.quizHeader}>
-          <Text style={styles.quizTitle}>Soạn bộ câu hỏi cho bài tập</Text>
-          <TouchableOpacity style={styles.addQBtn} onPress={handleAddQuestion}>
-            <Ionicons name="add" size={16} color="#4F46E5" />
-            <Text style={styles.addQBtnText}>Thêm câu</Text>
-          </TouchableOpacity>
-        </View>
-
-        {questions.map((q: any, qIndex: number) => (
-          <View key={qIndex} style={styles.questionCard}>
-            <View style={styles.qCardHeader}>
-              <Text style={styles.qIndex}>Câu hỏi {qIndex + 1}</Text>
-              <TouchableOpacity onPress={() => handleRemoveQuestion(qIndex)}>
-                <Ionicons name="trash-outline" size={18} color="#EF4444" />
-              </TouchableOpacity>
-            </View>
-
-            <TextInput 
-              style={[styles.input, { marginBottom: 12, height: 50 }]}
-              placeholder="Nhập nội dung câu hỏi bài tập..."
-              value={q.questionText}
-              onChangeText={(val) => handleQuestionChange(qIndex, 'questionText', val)}
-            />
-
-            <View style={styles.optionsGrid}>
-              {q.options.map((opt: string, oIndex: number) => (
-                <View key={oIndex} style={[styles.optionItem, q.correctAnswerIndex === oIndex && styles.optionItemActive]}>
-                  <TouchableOpacity 
-                    style={[styles.radio, q.correctAnswerIndex === oIndex && styles.radioActive]}
-                    onPress={() => handleQuestionChange(qIndex, 'correctAnswerIndex', oIndex)}
-                  >
-                    {q.correctAnswerIndex === oIndex && <View style={styles.radioInner} />}
-                  </TouchableOpacity>
-                  <TextInput 
-                    style={styles.optionInput}
-                    placeholder={`Đáp án ${String.fromCharCode(65 + oIndex)}`}
-                    value={opt}
-                    onChangeText={(val) => handleOptionChange(qIndex, oIndex, val)}
-                  />
-                </View>
-              ))}
-            </View>
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Thiết lập phần thưởng & Độ khó</Text>
-        <View style={styles.row}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.subLabel}>XP Thưởng</Text>
-            <TextInput 
-              style={styles.smallInput}
-              keyboardType="numeric"
-              value={xpReward}
-              onChangeText={setXpReward}
-              placeholder="Ví dụ: 100"
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.subLabel}>Thời gian (phút)</Text>
-            <TextInput 
-              style={styles.smallInput}
-              keyboardType="numeric"
-              value={estimatedMinutes}
-              onChangeText={setEstimatedMinutes}
-              placeholder="Ví dụ: 15"
-            />
-          </View>
-        </View>
-
-        <View style={{ marginTop: 12 }}>
-          <Text style={styles.subLabel}>Độ khó</Text>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={{ flex: 1 }}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Chọn lớp học</Text>
           <View style={styles.pickerContainer}>
-            {["Dễ", "Trung bình", "Khó"].map((d) => (
+            {classes.map((c) => (
               <TouchableOpacity 
-                key={d} 
-                style={[styles.pickerItem, difficulty === d && styles.pickerItemActive]}
-                onPress={() => setDifficulty(d)}
+                key={c._id} 
+                style={[styles.pickerItem, selectedClassId === c._id && styles.pickerItemActive]}
+                onPress={() => setSelectedClassId(c._id)}
               >
-                <Text style={[styles.pickerItemText, difficulty === d && styles.pickerItemTextActive]}>{d}</Text>
+                <Text style={[styles.pickerItemText, selectedClassId === c._id && styles.pickerItemTextActive]}>{c.name}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
-      </View>
 
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Hạn chót & Ghi chú</Text>
-        <TextInput 
-          placeholder="Nhập ghi chú hoặc yêu cầu cụ thể cho bài tập này..." 
-          style={styles.textInput}
-          multiline
-          value={notes}
-          onChangeText={setNotes}
-        />
-      </View>
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Chọn chủ đề bài học</Text>
+          <View style={styles.pickerContainer}>
+            {categories.map((cat) => (
+              <TouchableOpacity 
+                key={cat._id} 
+                style={[styles.pickerItem, selectedCatId === cat._id && styles.pickerItemActive]}
+                onPress={() => setSelectedCatId(cat._id)}
+              >
+                <Text style={[styles.pickerItemText, selectedCatId === cat._id && styles.pickerItemTextActive]}>{cat.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
-      <TouchableOpacity 
-        style={[styles.submitBtn, loading && { opacity: 0.7 }]} 
-        onPress={handleAssign}
-        disabled={loading}
-      >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Giao bài ngay</Text>}
-      </TouchableOpacity>
-    </ScrollView>
+        <View style={styles.quizSection}>
+          <View style={styles.quizHeader}>
+            <Text style={styles.quizTitle}>Soạn bộ câu hỏi cho bài tập</Text>
+            <TouchableOpacity style={styles.addQBtn} onPress={handleAddQuestion}>
+              <Ionicons name="add" size={16} color="#4F46E5" />
+              <Text style={styles.addQBtnText}>Thêm câu</Text>
+            </TouchableOpacity>
+          </View>
+
+          {questions.map((q: any, qIndex: number) => (
+            <View key={qIndex} style={styles.questionCard}>
+              <View style={styles.qCardHeader}>
+                <Text style={styles.qIndex}>Câu hỏi {qIndex + 1}</Text>
+                <TouchableOpacity onPress={() => handleRemoveQuestion(qIndex)}>
+                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+
+              <TextInput 
+                style={[styles.input, { marginBottom: 12, height: 50 }]}
+                placeholder="Nhập nội dung câu hỏi bài tập..."
+                value={q.questionText}
+                onChangeText={(val) => handleQuestionChange(qIndex, 'questionText', val)}
+              />
+
+              <View style={styles.optionsGrid}>
+                {q.options.map((opt: string, oIndex: number) => (
+                  <View key={oIndex} style={[styles.optionItem, q.correctAnswerIndex === oIndex && styles.optionItemActive]}>
+                    <TouchableOpacity 
+                      style={[styles.radio, q.correctAnswerIndex === oIndex && styles.radioActive]}
+                      onPress={() => handleQuestionChange(qIndex, 'correctAnswerIndex', oIndex)}
+                    >
+                      {q.correctAnswerIndex === oIndex && <View style={styles.radioInner} />}
+                    </TouchableOpacity>
+                    <TextInput 
+                      style={styles.optionInput}
+                      placeholder={`Đáp án ${String.fromCharCode(65 + oIndex)}`}
+                      value={opt}
+                      onChangeText={(val) => handleOptionChange(qIndex, oIndex, val)}
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Thiết lập phần thưởng & Độ khó</Text>
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.subLabel}>XP Thưởng</Text>
+              <TextInput 
+                style={styles.smallInput}
+                keyboardType="numeric"
+                value={xpReward}
+                onChangeText={setXpReward}
+                placeholder="Ví dụ: 100"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.subLabel}>Thời gian (phút)</Text>
+              <TextInput 
+                style={styles.smallInput}
+                keyboardType="numeric"
+                value={estimatedMinutes}
+                onChangeText={setEstimatedMinutes}
+                placeholder="Ví dụ: 15"
+              />
+            </View>
+          </View>
+
+          <View style={{ marginTop: 12 }}>
+            <Text style={styles.subLabel}>Độ khó</Text>
+            <View style={styles.pickerContainer}>
+              {["Dễ", "Trung bình", "Khó"].map((d) => (
+                <TouchableOpacity 
+                  key={d} 
+                  style={[styles.pickerItem, difficulty === d && styles.pickerItemActive]}
+                  onPress={() => setDifficulty(d)}
+                >
+                  <Text style={[styles.pickerItemText, difficulty === d && styles.pickerItemTextActive]}>{d}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Hạn chót & Ghi chú</Text>
+          <TextInput 
+            placeholder="Nhập ghi chú hoặc yêu cầu cụ thể cho bài tập này..." 
+            style={styles.textInput}
+            multiline
+            value={notes}
+            onChangeText={setNotes}
+          />
+        </View>
+
+        <TouchableOpacity 
+          style={[styles.submitBtn, loading && { opacity: 0.7 }]} 
+          onPress={handleAssign}
+          disabled={loading}
+        >
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Giao bài ngay</Text>}
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

@@ -13,7 +13,8 @@
       "bundleIdentifier": "com.gdds.toanhoc"
     },
     "android": {
-      "package": "com.gdds.toanhoc"
+      "package": "com.gdds.toanhoc",
+      "softwareKeyboardLayoutMode": "adjustResize"
     },
     "web": {
       "bundler": "metro"

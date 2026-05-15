@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, Image, TouchableOpaci
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import client, { BASE_URL } from "../../src/api/client";
+import client, { BASE_URL, resolveImageUrl } from "../../src/api/client";
 import { io } from "socket.io-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -22,7 +22,7 @@ export default function CategoryDetailScreen() {
     title: "",
     description: "",
     content: "",
-    category: name as string,
+    category: (name as string) || "",
     imageUrl: "",
     xpReward: 100,
     estimatedMinutes: 15,
@@ -32,6 +32,17 @@ export default function CategoryDetailScreen() {
       { questionText: "", options: ["", "", "", ""], correctAnswerIndex: 0, explanation: "" }
     ]
   });
+
+  // Cập nhật formData khi categoryInfo thay đổi
+  useEffect(() => {
+    if (categoryInfo) {
+      setFormData(prev => ({
+        ...prev,
+        category: categoryInfo.name,
+        subject: categoryInfo.subject || "Toán học"
+      }));
+    }
+  }, [categoryInfo]);
 
   useEffect(() => {
     fetchData();
@@ -65,18 +76,21 @@ export default function CategoryDetailScreen() {
       const currentCat = categoriesRes.data.find((c: any) => c._id === id || c.name === name);
       setCategoryInfo(currentCat);
 
-      // Tuyệt chiêu: Gửi category lên backend để backend lọc thông minh (khớp tên OR khớp bài được giao)
+      // Gửi cả category (tên) và categoryId (ID chuẩn) lên backend
       const currentName = (name as string || "").trim();
       const lessonsEndpoint = isStudent 
-        ? `/lessons/for-student?category=${encodeURIComponent(currentName)}` 
-        : `/lessons?category=${encodeURIComponent(currentName)}`;
+        ? `/lessons/for-student?category=${encodeURIComponent(currentName)}&categoryId=${currentCat?._id || id}` 
+        : `/lessons?category=${encodeURIComponent(currentName)}&categoryId=${currentCat?._id || id}`;
         
+      console.log("[DEBUG] App is fetching lessons from:", lessonsEndpoint);
       const lessonsRes = await client.get(lessonsEndpoint);
-      setLessons(lessonsRes.data);
+      console.log(`[DEBUG] App received ${lessonsRes.data?.length} lessons from backend`);
+      setLessons(lessonsRes.data || []);
       
     } catch (e) {
-      console.error("Failed to fetch category lessons", e);
+      console.error("[DEBUG] Failed to fetch category lessons:", e);
     } finally {
+      console.log("[DEBUG] Fetch data finally block executed");
       setLoading(false);
     }
   };
@@ -108,7 +122,11 @@ export default function CategoryDetailScreen() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      setFormData({ ...formData, imageUrl: BASE_URL + res.data.url });
+      const imageUrl = res.data.url.startsWith('http') 
+        ? res.data.url 
+        : BASE_URL + res.data.url;
+
+      setFormData({ ...formData, imageUrl });
     } catch (error) {
       Alert.alert("Lỗi", "Không thể tải ảnh lên máy chủ");
     } finally {
@@ -252,7 +270,7 @@ export default function CategoryDetailScreen() {
         {/* Category Hero */}
         <View style={styles.heroSection}>
           <Image 
-            source={{ uri: categoryInfo?.imageUrl?.trim() || "https://images.unsplash.com/photo-1528127269322-539801943592?q=80&w=400" }} 
+            source={{ uri: resolveImageUrl(categoryInfo?.imageUrl) }} 
             style={styles.heroImg} 
           />
           <View style={styles.heroOverlay}>
@@ -291,7 +309,7 @@ export default function CategoryDetailScreen() {
                 style={styles.lessonCard}
                 onPress={() => router.push(`/lesson/${lesson._id}`)}
               >
-                <Image source={{ uri: lesson.imageUrl }} style={styles.lessonThumb} />
+                <Image source={{ uri: resolveImageUrl(lesson.imageUrl) }} style={styles.lessonThumb} />
                 <View style={styles.lessonInfo}>
                   <Text style={styles.lessonTitle}>{lesson.title}</Text>
                   <View style={styles.lessonMeta}>
@@ -361,7 +379,7 @@ export default function CategoryDetailScreen() {
                   <Text style={styles.inputLabel}>Ảnh minh họa bài học</Text>
                   <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
                     {formData.imageUrl ? (
-                      <Image source={{ uri: formData.imageUrl }} style={styles.pickedImage} />
+                      <Image source={{ uri: resolveImageUrl(formData.imageUrl) }} style={styles.pickedImage} />
                     ) : (
                       <View style={styles.imagePlaceholder}>
                         <Ionicons name="image-outline" size={40} color="#cbd5e1" />

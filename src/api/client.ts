@@ -2,9 +2,10 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const BASE_URL = Platform.OS === 'android' 
-  ? 'http://10.0.2.2:3001' 
-  : 'http://192.168.1.186:3001';
+export const BASE_URL = 'https://gdht-backend.onrender.com';
+// export const BASE_URL = Platform.OS === 'android' 
+//   ? 'http://10.0.2.2:3000' 
+//   : 'http://192.168.1.186:3000';
 
 export const resolveImageUrl = (url: string | null | undefined) => {
   if (!url) return "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";

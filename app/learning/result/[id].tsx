@@ -37,6 +37,8 @@ export default function QuizResultScreen() {
           <Ionicons name="close" size={28} color="#1e293b" />
         </TouchableOpacity>
       </View>
+
+      <View style={styles.content}>
         {isPreview && (
           <View style={styles.previewBadge}>
             <Ionicons name="eye" size={16} color="#4F46E5" />

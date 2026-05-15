@@ -464,15 +464,8 @@ export default function ClassDetailScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Hiển thị Bài học từ thư viện (Đã lọc theo khối lớp) */}
+              {/* Hiển thị Bài học từ thư viện */}
               {lessons
-                .filter((lesson: any) => {
-                  const classLevel = classData?.name?.match(/\d+/)?.[0];
-                  if (!classLevel) return true;
-                  const lessonTitle = lesson.title?.toLowerCase() || "";
-                  const lessonCat = lesson.category?.toLowerCase() || "";
-                  return lessonTitle.includes(`lớp ${classLevel}`) || lessonCat.includes(`lớp ${classLevel}`);
-                })
                 .map((lesson: any) => {
                   const isAssigned = classData?.assignedLessons?.some((al: any) => al._id === lesson._id);
                   const cat = categories.find(c => c.name === lesson.category || c._id === lesson.categoryId);
@@ -554,16 +547,6 @@ export default function ClassDetailScreen() {
 
             <ScrollView style={styles.modalList}>
               {lessons
-                .filter((lesson: any) => {
-                  // Lấy số lớp từ tên lớp (ví dụ "Lớp 1A" -> "1")
-                  const classLevel = classData?.name?.match(/\d+/)?.[0];
-                  if (!classLevel) return true; // Nếu không tìm thấy số thì hiện hết
-
-                  // Chỉ hiện những bài có chứa số lớp đó trong tiêu đề hoặc chủ đề
-                  const lessonTitle = lesson.title?.toLowerCase() || "";
-                  const lessonCat = lesson.category?.toLowerCase() || "";
-                  return lessonTitle.includes(`lớp ${classLevel}`) || lessonCat.includes(`lớp ${classLevel}`);
-                })
                 .map((lesson: any) => {
                   const isAssigned = classData?.assignedLessons?.some((al: any) => al._id === lesson._id);
                   return (
@@ -911,7 +894,7 @@ function ManageLessonItem({ lessonId, title, category, img, isAssigned, isFeatur
         {
           text: "Học thử (Xem trước)",
           onPress: () => router.push({
-            pathname: "/learning/[id]",
+            pathname: "/learning/story/[id]",
             params: { id: lessonId, preview: "true" }
           })
         },
@@ -930,13 +913,6 @@ function ManageLessonItem({ lessonId, title, category, img, isAssigned, isFeatur
         <Text style={styles.hwDate}>{category}</Text>
       </View>
       <View style={styles.hwActions}>
-        <TouchableOpacity onPress={(e: any) => { e.stopPropagation(); onToggleFeatured(); }} style={{ marginRight: 15 }}>
-          <Ionicons
-            name={isFeatured ? "star" : "star-outline"}
-            size={22}
-            color={isFeatured ? "#FFD700" : "#94a3b8"}
-          />
-        </TouchableOpacity>
         <TouchableOpacity onPress={(e: any) => { e.stopPropagation(); onAssign(); }} style={{ marginRight: 15 }}>
           <Ionicons
             name={isAssigned ? "checkmark-circle" : "add-circle-outline"}

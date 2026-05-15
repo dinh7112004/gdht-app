@@ -17,7 +17,6 @@ export default function RootLayout() {
           <Stack.Screen name="(student)" />
           <Stack.Screen name="share-post" options={{ presentation: 'modal' }} />
           <Stack.Screen name="lesson/[id]" />
-          <Stack.Screen name="learning/[id]" />
           <Stack.Screen name="learning/quiz/[id]" />
           <Stack.Screen name="learning/story/[id]" />
           <Stack.Screen name="learning/result/[id]" />
