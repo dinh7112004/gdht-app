@@ -4,7 +4,7 @@
     "slug": "gdds-toanhoc",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/onboarding/step1.png",
+    "icon": "./assets/role_student.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "scheme": "gdds-toanhoc",
