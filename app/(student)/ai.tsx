@@ -10,7 +10,7 @@ import { useTranslation } from "../../src/context/LanguageContext";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 // INITIALIZE GEMINI
-const API_KEY = "AIzaSyBT-Zs_YDUxQl5lvNjylQ3oQgjqFm8j2jE";
+const API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
