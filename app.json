@@ -10,10 +10,13 @@
     "scheme": "gdds-toanhoc",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.gdds.toanhoc"
+      "bundleIdentifier": "com.giaoduchoctap",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "package": "com.gdds.toanhoc",
+      "package": "com.giaoduchoctap",
       "softwareKeyboardLayoutMode": "adjustResize"
     },
     "web": {
@@ -21,6 +24,12 @@
     },
     "plugins": [
       "expo-router"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "71880078-60c4-4a3a-a370-172478407d18"
+      }
+    }
   }
 }
