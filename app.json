@@ -18,6 +18,11 @@
       "bundleIdentifier": "com.giaoduchoctap",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.developer.applesignin": [
+          "Default"
+        ]
       }
     },
     "android": {
@@ -30,7 +35,8 @@
     "plugins": [
       "expo-router",
       "expo-web-browser",
-      "expo-audio"
+      "expo-audio",
+      "expo-apple-authentication"
     ],
     "extra": {
       "router": {},
