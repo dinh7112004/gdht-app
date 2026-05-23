@@ -11,8 +11,17 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 // INITIALIZE GEMINI
 const API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
-const genAI = new GoogleGenerativeAI(API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+let genAI: GoogleGenerativeAI | null = null;
+let model: any = null;
+
+try {
+  if (API_KEY) {
+    genAI = new GoogleGenerativeAI(API_KEY);
+    model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  }
+} catch (e) {
+  console.warn("Gemini init error", e);
+}
 
 const GET_SYSTEM_PROMPT = (lang: string) => `BẠN LÀ: '${lang === 'vi' ? 'Chú Rồng Di Sản' : 'Heritage Dragon'}' - Trợ lý trí tuệ nhân tạo chuyên sâu về giáo dục Toán học và Văn hóa Di sản Việt Nam dành cho học sinh tiểu học và trung học cơ sở.
 

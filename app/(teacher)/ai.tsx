@@ -24,9 +24,19 @@ import { useTranslation } from "../../src/context/LanguageContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
+// INITIALIZE GEMINI
 const API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || "";
-const genAI = new GoogleGenerativeAI(API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+let genAI: GoogleGenerativeAI | null = null;
+let model: any = null;
+
+try {
+  if (API_KEY) {
+    genAI = new GoogleGenerativeAI(API_KEY);
+    model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  }
+} catch (e) {
+  console.warn("Gemini init error", e);
+}
 
 const GET_TEACHER_SYSTEM_PROMPT = (lang: string) =>
   `BẠN LÀ: 'Cố Vấn Di Sản' - Chuyên gia giáo dục và Trợ lý Trí tuệ Nhân tạo cao cấp dành riêng cho các Thầy Cô giáo trong hệ thống Heritage Math.
