@@ -8,7 +8,18 @@ import * as Notifications from "expo-notifications";
 import { registerForPushNotifications } from "../src/services/pushNotifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import { View, Text, SafeAreaView } from "react-native";
 
+export function ErrorBoundary({ error, retry }: any) {
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#ef4444', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+      <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 24, marginBottom: 10 }}>LỖI ỨNG DỤNG!</Text>
+      <Text style={{ color: 'white', fontSize: 16, textAlign: 'center' }}>Vui lòng chụp màn hình này gửi cho Dinh:</Text>
+      <Text style={{ color: 'white', marginTop: 20, fontSize: 14, fontWeight: 'bold' }}>{String(error)}</Text>
+      {error.stack && <Text style={{ color: 'white', marginTop: 10, fontSize: 10 }}>{error.stack.substring(0, 800)}</Text>}
+    </SafeAreaView>
+  );
+}
 function NotificationBootstrap() {
   const router = useRouter();
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
