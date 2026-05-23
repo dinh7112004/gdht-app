@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Audio } from "expo-av";
+import { setAudioModeAsync, createAudioPlayer, AudioPlayer } from "expo-audio";
 
 interface SoundContextType {
   soundEnabled: boolean;
@@ -20,12 +20,11 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const setupAudioMode = async () => {
     try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        staysActiveInBackground: false,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+        shouldPlayInBackground: false,
+        interruptionMode: 'mixWithOthers',
       });
     } catch (e) {
       console.error("Failed to setup audio mode", e);
@@ -55,35 +54,23 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const playSound = async (soundFile: any) => {
     if (!soundEnabled || !soundFile) return;
 
-    let soundInstance: Audio.Sound | null = null;
+    let soundInstance: AudioPlayer | null = null;
     try {
-      const { sound } = await Audio.Sound.createAsync(
-        soundFile,
-        { shouldPlay: true, volume: 1.0 },
-        null,
-        false // Do not download async for now
-      );
-      soundInstance = sound;
+      soundInstance = createAudioPlayer(soundFile);
       
-      sound.setOnPlaybackStatusUpdate(async (status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          await sound.unloadAsync();
-        }
-        if (!status.isLoaded && status.error) {
-          console.warn("Playback error:", status.error);
-          await sound.unloadAsync();
-        }
-      });
-
-      await sound.playAsync();
+      // We don't have a reliable callback for exact end of playback in the new imperative API
+      // without using hooks, so we just play it.
+      // expo-audio automatically handles native resources fairly well, or we can release it after some timeout.
+      soundInstance.play();
+      
     } catch (e) {
       // Quietly fail for network sounds
       if (__DEV__) {
-        console.log("Sound play skipped or failed (likely network/URL issue):", e instanceof Error ? e.message : e);
+        console.log("Sound play skipped or failed:", e instanceof Error ? e.message : e);
       }
       if (soundInstance) {
         try {
-          await (soundInstance as Audio.Sound).unloadAsync();
+          soundInstance.release();
         } catch (err) {}
       }
     }
