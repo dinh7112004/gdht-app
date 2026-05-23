@@ -5,7 +5,7 @@
     "owner": "dinh2004",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/role_student.png",
+   "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "scheme": [
@@ -27,7 +27,7 @@
     },
     "android": {
       "package": "com.giaoduchoctap",
-      "softwareKeyboardLayoutMode": "adjustResize"
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
       "bundler": "metro"
@@ -35,7 +35,9 @@
     "plugins": [
       "expo-router",
       "expo-web-browser",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "expo-asset",
+      "expo-font"
     ],
     "extra": {
       "router": {},
