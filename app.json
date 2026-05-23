@@ -35,7 +35,6 @@
     "plugins": [
       "expo-router",
       "expo-web-browser",
-      "expo-audio",
       "expo-apple-authentication"
     ],
     "extra": {
