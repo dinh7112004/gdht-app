@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { View, Text, StyleSheet, SafeAreaView, Image, TextInput, TouchableOpacity, ScrollView, useWindowDimensions, KeyboardAvoidingView, Platform, ActivityIndicator, Dimensions } from "react-native";
+import { View, Text, StyleSheet, SafeAreaView, Image, TextInput, TouchableOpacity, ScrollView, useWindowDimensions, KeyboardAvoidingView, Platform, ActivityIndicator, Dimensions, Keyboard } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -119,9 +119,22 @@ export default function AIScreen() {
     }
   };
 
+  const scrollToBottom = (animated = true) => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated });
+    }, 100);
+  };
+
   useEffect(() => {
-    scrollViewRef.current?.scrollToEnd({ animated: true });
+    scrollToBottom();
   }, [messages, loading]);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", () => {
+      scrollToBottom();
+    });
+    return () => showSub.remove();
+  }, []);
 
   const clearChat = async () => {
     if (userId) {
@@ -156,7 +169,7 @@ export default function AIScreen() {
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        keyboardVerticalOffset={0}
       >
         <ScrollView 
           ref={scrollViewRef}

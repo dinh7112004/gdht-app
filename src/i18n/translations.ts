@@ -81,7 +81,13 @@ export const translations: any = {
     today_challenge: "THỬ THÁCH HÔM NAY",
     start_learning: "Bắt đầu học ngay",
     join_now: "Tham gia ngay để nhận",
+    continue_learning: "Tiếp tục học",
+    continue: "Tiếp tục",
+    progress: "Tiến độ",
+    learning_status: "Đang học",
     featured_topics: "Chủ đề nổi bật",
+    join_class_to_see_topics: "Tham gia lớp học để xem chủ đề nổi bật",
+    join_class: "Tham gia lớp học",
     
     // Explore Screen
     search_placeholder: "Tìm kiếm bài học, chủ đề...",
@@ -252,7 +258,13 @@ export const translations: any = {
     today_challenge: "TODAY'S CHALLENGE",
     start_learning: "Start Learning Now",
     join_now: "Join now to get",
+    continue_learning: "Continue Learning",
+    continue: "Continue",
+    progress: "Progress",
+    learning_status: "Learning",
     featured_topics: "Featured Topics",
+    join_class_to_see_topics: "Join a class to see featured topics",
+    join_class: "Join a Class",
 
     // Explore Screen
     search_placeholder: "Search lessons, topics...",

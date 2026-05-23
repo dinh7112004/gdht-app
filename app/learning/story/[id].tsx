@@ -4,7 +4,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import Svg, { Path } from "react-native-svg";
-import client from "../../../src/api/client";
+import client, { resolveImageUrl } from "../../../src/api/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width, height } = Dimensions.get("window");
@@ -150,7 +150,7 @@ export default function StoryModeScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <ImageBackground source={{ uri: lesson?.imageUrl }} style={styles.background}>
+      <ImageBackground source={{ uri: resolveImageUrl(lesson?.imageUrl) }} style={styles.background}>
         <View style={styles.overlay} />
         
         <SafeAreaView style={styles.premiumHeader}>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Image, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Share } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Image, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Share, Keyboard } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -14,11 +14,25 @@ export default function PostDetailScreen() {
   const [comment, setComment] = useState("");
   const [sending, setSending] = useState(false);
   const [userData, setUserData] = useState<any>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const scrollToBottom = (animated = true) => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated });
+    }, 100);
+  };
 
   useEffect(() => {
     fetchPost();
     loadUserData();
   }, [id]);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", () => {
+      scrollToBottom();
+    });
+    return () => showSub.remove();
+  }, []);
 
   const loadUserData = async () => {
     const data = await AsyncStorage.getItem("userData");
@@ -56,7 +70,8 @@ export default function PostDetailScreen() {
         content: comment.trim()
       });
       setComment("");
-      fetchPost();
+      await fetchPost();
+      scrollToBottom();
     } catch (e) {
       console.error("Failed to send comment", e);
     } finally {
@@ -100,7 +115,7 @@ export default function PostDetailScreen() {
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
       >
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           {/* Post Content */}
           <View style={styles.postSection}>
             <View style={styles.authorInfo}>

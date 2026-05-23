@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ScrollView, Ima
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import client from "../../src/api/client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import client, { resolveImageUrl } from "../../src/api/client";
 
 export default function RewardsScreen() {
   const router = useRouter();
@@ -12,18 +13,33 @@ export default function RewardsScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchData();
+    const loadWithCache = async () => {
+      try {
+        const cached = await AsyncStorage.getItem("profile_rewards_cache");
+        if (cached) {
+          const data = JSON.parse(cached);
+          setItems(data.items || []);
+          setUserData(data.userData);
+          setLoading(false);
+        }
+      } catch (_) {}
+      fetchData();
+    };
+    void loadWithCache();
   }, []);
 
   const fetchData = async () => {
     try {
-      setLoading(true);
       const [itemsRes, profileRes] = await Promise.all([
         client.get("/items"),
         client.get("/auth/profile")
       ]);
       setItems(itemsRes.data);
       setUserData(profileRes.data);
+      await AsyncStorage.setItem("profile_rewards_cache", JSON.stringify({
+        items: itemsRes.data,
+        userData: profileRes.data,
+      }));
     } catch (e) {
       console.error("Failed to fetch shop data", e);
     } finally {
@@ -83,7 +99,7 @@ export default function RewardsScreen() {
           <View key={item._id} style={styles.rewardCard}>
             <View style={[styles.rewardIconBox, { backgroundColor: (item.color || '#F1F5F9') + '15' }]}>
               {item.imageUrl ? (
-                <Image source={{ uri: item.imageUrl }} style={styles.rewardImg} />
+                <Image source={{ uri: resolveImageUrl(item.imageUrl) }} style={styles.rewardImg} />
               ) : (
                 <Ionicons name="cube" size={40} color={item.color || '#CBD5E1'} />
               )}

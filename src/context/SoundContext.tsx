@@ -69,7 +69,7 @@ export const SoundProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (status.isLoaded && status.didJustFinish) {
           await sound.unloadAsync();
         }
-        if (status.isLoaded && status.error) {
+        if (!status.isLoaded && status.error) {
           console.warn("Playback error:", status.error);
           await sound.unloadAsync();
         }

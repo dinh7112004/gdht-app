@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, Image, TouchableOpaci
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import client from "../../src/api/client";
 
 const { width } = Dimensions.get("window");
@@ -16,18 +17,33 @@ export default function AchievementsScreen() {
   const [claimingId, setClaimingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchData();
+    const loadWithCache = async () => {
+      try {
+        const cached = await AsyncStorage.getItem("profile_achievements_cache");
+        if (cached) {
+          const data = JSON.parse(cached);
+          setUserData(data.userData);
+          setAllAchievements(data.allAchievements || []);
+          setLoading(false);
+        }
+      } catch (_) {}
+      fetchData();
+    };
+    void loadWithCache();
   }, []);
 
   const fetchData = async () => {
     try {
-      setLoading(true);
       const [profileRes, achievementsRes] = await Promise.all([
         client.get("/auth/profile"),
         client.get("/achievements")
       ]);
       setUserData(profileRes.data);
       setAllAchievements(achievementsRes.data);
+      await AsyncStorage.setItem("profile_achievements_cache", JSON.stringify({
+        userData: profileRes.data,
+        allAchievements: achievementsRes.data,
+      }));
     } catch (e) {
       console.error("Failed to fetch achievements data", e);
     } finally {

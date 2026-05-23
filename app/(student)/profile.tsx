@@ -25,24 +25,36 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchProfile();
-      
-      // Nếu quay lại từ kho đồ với lệnh triggerRename
-      if (params.triggerRename === "true") {
-          setShowEditModal(true);
-          // Xóa param sau khi đã dùng để tránh việc cứ focus là hiện modal
-          router.setParams({ triggerRename: undefined });
-      }
+      const loadWithCache = async () => {
+        try {
+          const cached = await AsyncStorage.getItem("student_profile_cache");
+          if (cached) {
+            const data = JSON.parse(cached);
+            setUserData(data.userData);
+            setEditName(data.userData?.fullName || "");
+            setLoading(false);
+          }
+        } catch (_) {}
+        fetchProfile();
+
+        // Nếu quay lại từ kho đồ với lệnh triggerRename
+        if (params.triggerRename === "true") {
+            setShowEditModal(true);
+            // Xóa param sau khi đã dùng để tránh việc cứ focus là hiện modal
+            router.setParams({ triggerRename: undefined });
+        }
+      };
+      void loadWithCache();
     }, [params.triggerRename])
   );
 
   const fetchProfile = async () => {
     try {
-      setLoading(true);
       const res = await client.get("/auth/profile");
       setUserData(res.data);
       setEditName(res.data.fullName);
       await AsyncStorage.setItem("userData", JSON.stringify(res.data));
+      await AsyncStorage.setItem("student_profile_cache", JSON.stringify({ userData: res.data }));
     } catch (e) {
       console.error("Failed to fetch profile", e);
       const data = await AsyncStorage.getItem("userData");
@@ -151,14 +163,14 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         
         <View style={styles.profileHeader}>
-          <RenderAvatar />
+          <TouchableOpacity onPress={() => router.push("/profile/account-info")}>
+            <RenderAvatar />
+          </TouchableOpacity>
           <View style={styles.userInfo}>
-            <View style={styles.nameRow}>
+            <TouchableOpacity onPress={() => router.push("/profile/account-info")} style={styles.nameRow}>
                <Text style={styles.userName}>{userData?.fullName || t('student')}</Text>
-               <TouchableOpacity style={styles.editIcon} onPress={() => setShowEditModal(true)}>
-                  <Ionicons name={hasEnoughCards ? "pencil" : "lock-closed"} size={16} color="#94A3B8" />
-               </TouchableOpacity>
-            </View>
+               <Ionicons name="chevron-forward" size={16} color="#94A3B8" style={{ marginLeft: 4 }} />
+            </TouchableOpacity>
             <View style={styles.roleTag}>
               <View style={styles.badgeIconBox}>
                  <Ionicons name="star" size={12} color="#FFF" />
@@ -225,6 +237,7 @@ export default function ProfileScreen() {
           <ProfileMenu icon="briefcase-outline" label={t('inventory')} color="#8B5CF6" onPress={() => router.push("/profile/inventory")} />
           <ProfileMenu icon="gift-outline" label={t('rewards')} color="#F59E0B" onPress={() => router.push("/profile/rewards")} />
           <ProfileMenu icon="share-social-outline" label="Chia sẻ cách học hay" color="#10B981" onPress={() => router.push({ pathname: "/share-post", params: { type: "LEARNING_TIP" } })} />
+          <ProfileMenu icon="notifications-outline" label="Thông báo" color="#EF4444" onPress={() => router.push("/(student)/notifications")} />
           <ProfileMenu icon="settings-outline" label={t('settings')} color="#64748b" onPress={() => router.push("/profile/settings")} />
           
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>

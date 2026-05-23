@@ -15,17 +15,16 @@ export default function StudentLayout() {
     const checkRole = async () => {
       const data = await AsyncStorage.getItem("userData");
       if (data) {
-        const user = JSON.parse(data);
-        setRole(user.role);
+        const user = JSON.parse(data) as { role?: string };
+        setRole(user.role ?? null);
       }
       setLoading(false);
     };
-    checkRole();
+    void checkRole();
   }, []);
 
   if (loading) return null;
 
-  // Nếu là giáo viên: Chỉ cho phép vào các trang bài học/quiz để preview, còn lại thì Redirect về /(teacher)
   if (role === "TEACHER") {
     const isAllowedPage = pathname.includes("/learning") || pathname.includes("/lesson");
     if (!isAllowedPage) {
@@ -34,79 +33,87 @@ export default function StudentLayout() {
   }
 
   return (
-    <Tabs screenOptions={{ 
-      headerShown: false,
-      tabBarActiveTintColor: "#2E7D32",
-      tabBarInactiveTintColor: "#94a3b8",
-      tabBarStyle: {
-        borderTopWidth: 1,
-        borderTopColor: "#FEF9C3",
-        elevation: 0,
-        height: Platform.OS === 'ios' ? 88 : 64,
-        paddingBottom: Platform.OS === 'ios' ? 28 : 10,
-        paddingTop: 10,
-        backgroundColor: "#FFFDF0",
-      },
-      tabBarLabelStyle: {
-        fontSize: 12,
-        fontWeight: "600",
-      }
-    }}>
-      <Tabs.Screen 
-        name="index" 
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: "#2E7D32",
+        tabBarInactiveTintColor: "#94a3b8",
+        tabBarStyle: {
+          borderTopWidth: 1,
+          borderTopColor: "#FEF9C3",
+          elevation: 0,
+          height: Platform.OS === "ios" ? 88 : 64,
+          paddingBottom: Platform.OS === "ios" ? 28 : 10,
+          paddingTop: 10,
+          backgroundColor: "#FFFDF0",
+        },
+        tabBarLabelStyle: { fontSize: 12, fontWeight: "600" },
+      }}
+    >
+      <Tabs.Screen
+        name="index"
         options={{
-          tabBarLabel: t('home_tab'),
+          tabBarLabel: t("home_tab"),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
           ),
         }}
       />
-      <Tabs.Screen 
-        name="explore" 
+      <Tabs.Screen
+        name="explore"
         options={{
-          tabBarLabel: t('explore_tab'),
+          tabBarLabel: t("explore_tab"),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "compass" : "compass-outline"} size={24} color={color} />
           ),
         }}
       />
-      <Tabs.Screen 
-        name="ai" 
+      <Tabs.Screen
+        name="ai"
         options={{
-          tabBarLabel: t('ai_tab'),
+          tabBarLabel: t("ai_tab"),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"} size={24} color={color} />
+            <Ionicons
+              name={focused ? "chatbubble-ellipses" : "chatbubble-ellipses-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
-      <Tabs.Screen 
-        name="classroom" 
+      <Tabs.Screen
+        name="classroom"
         options={{
-          tabBarLabel: t('classes_tab'),
+          tabBarLabel: t("classes_tab"),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "school" : "school-outline"} size={24} color={color} />
           ),
         }}
       />
-      <Tabs.Screen 
-        name="profile" 
+      <Tabs.Screen
+        name="chat"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="profile"
         options={{
-          tabBarLabel: t('profile_title'),
+          tabBarLabel: t("profile_title"),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
           ),
         }}
       />
-      
+
       <Tabs.Screen name="community" options={{ href: null }} />
       <Tabs.Screen name="missions" options={{ href: null }} />
       <Tabs.Screen name="all-categories" options={{ href: null }} />
-      <Tabs.Screen 
-        name="lesson/[id]" 
-        options={{ 
-          href: null,
-          tabBarStyle: { display: 'none' }
-        }} 
+      <Tabs.Screen
+        name="lesson/[id]"
+        options={{ href: null, tabBarStyle: { display: "none" } }}
       />
     </Tabs>
   );

@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, Image, TouchableOpaci
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import client from "../../src/api/client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import client, { resolveImageUrl } from "../../src/api/client";
 
 const { width } = Dimensions.get("window");
 
@@ -14,14 +15,25 @@ export default function InventoryScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchProfile();
+    const loadWithCache = async () => {
+      try {
+        const cached = await AsyncStorage.getItem("profile_inventory_cache");
+        if (cached) {
+          const data = JSON.parse(cached);
+          setUserData(data.userData);
+          setLoading(false);
+        }
+      } catch (_) {}
+      fetchProfile();
+    };
+    void loadWithCache();
   }, []);
 
   const fetchProfile = async () => {
     try {
-      setLoading(true);
       const res = await client.get("/auth/profile");
       setUserData(res.data);
+      await AsyncStorage.setItem("profile_inventory_cache", JSON.stringify({ userData: res.data }));
     } catch (e) {
       console.error("Failed to fetch inventory", e);
     } finally {
@@ -164,7 +176,7 @@ export default function InventoryScreen() {
             >
               <View style={[styles.imgBox, { backgroundColor: (item.itemId?.color || '#F1F5F9') + '15' }]}>
                 {item.itemId?.imageUrl ? (
-                  <Image source={{ uri: item.itemId.imageUrl }} style={styles.itemImg} />
+                  <Image source={{ uri: resolveImageUrl(item.itemId.imageUrl) }} style={styles.itemImg} />
                 ) : (
                   <Ionicons name="cube" size={40} color={item.itemId?.color || '#CBD5E1'} />
                 )}

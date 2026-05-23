@@ -5,56 +5,61 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import client from "../../src/api/client";
 
+type Step = "form" | "otp";
+
 export default function RegisterScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ role?: string }>();
-  
+
+  const [step, setStep] = useState<Step>("form");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
-  const [selectedRole, setSelectedRole] = useState(params.role || "STUDENT");
+  const [selectedRole] = useState(params.role || "STUDENT");
 
-  // Error states
   const [nameError, setNameError] = useState("");
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [confirmError, setConfirmError] = useState("");
+  const [otpError, setOtpError] = useState("");
   const [generalError, setGeneralError] = useState("");
 
-  const handleRegister = async () => {
-    // Reset errors
-    setNameError("");
-    setEmailError("");
-    setPasswordError("");
-    setConfirmError("");
-    setGeneralError("");
-
+  const handleSendOtp = async () => {
+    setNameError(""); setEmailError(""); setPasswordError(""); setConfirmError(""); setGeneralError("");
     let hasError = false;
     if (!fullName) { setNameError("Vui lòng nhập họ và tên"); hasError = true; }
-    if (!email) { setEmailError("Vui lòng nhập email hoặc số điện thoại"); hasError = true; }
+    if (!email) { setEmailError("Vui lòng nhập email"); hasError = true; }
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailError("Email không hợp lệ"); hasError = true; }
     if (password.length < 6) { setPasswordError("Mật khẩu phải có ít nhất 6 ký tự"); hasError = true; }
     if (password !== confirmPassword) { setConfirmError("Mật khẩu xác nhận không khớp"); hasError = true; }
-
     if (hasError) return;
 
     setLoading(true);
     try {
-      await client.post("/auth/register", {
-        fullName,
-        email,
-        password,
-        role: selectedRole
-      });
-      
-      router.replace({
-        pathname: "/(auth)/login",
-        params: { role: selectedRole }
-      });
+      await client.post("/auth/send-otp", { email });
+      setStep("otp");
+    } catch (error: any) {
+      setGeneralError(error.response?.data?.message || "Không thể gửi mã OTP. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    setOtpError(""); setGeneralError("");
+    if (!otp || otp.length !== 6) { setOtpError("Vui lòng nhập mã OTP 6 số"); return; }
+
+    setLoading(true);
+    try {
+      await client.post("/auth/register", { fullName, email, password, role: selectedRole, otp });
+      router.replace({ pathname: "/(auth)/login", params: { role: selectedRole } });
     } catch (error: any) {
       const message = error.response?.data?.message || "Đăng ký thất bại. Vui lòng thử lại.";
-      setGeneralError(message);
+      if (message.includes("OTP")) setOtpError(message);
+      else setGeneralError(message);
     } finally {
       setLoading(false);
     }
@@ -63,21 +68,17 @@ export default function RegisterScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-      >
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          
+
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <Image 
-                source={require("../../assets/img1.jpg")} 
-                style={styles.logo}
-              />
+              <Image source={require("../../assets/img1.jpg")} style={styles.logo} />
             </View>
             <Text style={styles.title}>Tạo tài khoản mới</Text>
-            <Text style={styles.subtitle}>Cùng bắt đầu hành trình học tập thú vị nhé!</Text>
+            <Text style={styles.subtitle}>
+              {step === "form" ? "Cùng bắt đầu hành trình học tập thú vị nhé!" : `Nhập mã OTP đã gửi đến\n${email}`}
+            </Text>
           </View>
 
           <View style={styles.form}>
@@ -88,74 +89,69 @@ export default function RegisterScreen() {
               </View>
             ) : null}
 
-            <View style={[styles.inputContainer, nameError ? styles.inputError : null]}>
-              <Ionicons name="person-outline" size={20} color={nameError ? "#ef4444" : "#64748b"} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Họ và tên"
-                value={fullName}
-                onChangeText={(text) => { setFullName(text); setNameError(""); }}
-              />
-            </View>
-            {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
+            {step === "form" ? (
+              <>
+                <View style={[styles.inputContainer, nameError ? styles.inputError : null]}>
+                  <Ionicons name="person-outline" size={20} color={nameError ? "#ef4444" : "#64748b"} style={styles.inputIcon} />
+                  <TextInput style={styles.input} placeholder="Họ và tên" value={fullName} onChangeText={(t) => { setFullName(t); setNameError(""); }} />
+                </View>
+                {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
 
-            <View style={[styles.inputContainer, emailError ? styles.inputError : null, { marginTop: nameError ? 8 : 16 }]}>
-              <Ionicons name="mail-outline" size={20} color={emailError ? "#ef4444" : "#64748b"} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Email hoặc số điện thoại"
-                value={email}
-                onChangeText={(text) => { setEmail(text); setEmailError(""); }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-            {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+                <View style={[styles.inputContainer, emailError ? styles.inputError : null, { marginTop: nameError ? 8 : 16 }]}>
+                  <Ionicons name="mail-outline" size={20} color={emailError ? "#ef4444" : "#64748b"} style={styles.inputIcon} />
+                  <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={(t) => { setEmail(t); setEmailError(""); }} keyboardType="email-address" autoCapitalize="none" />
+                </View>
+                {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
-            <View style={[styles.inputContainer, passwordError ? styles.inputError : null, { marginTop: emailError ? 8 : 16 }]}>
-              <Ionicons name="lock-closed-outline" size={20} color={passwordError ? "#ef4444" : "#64748b"} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Mật khẩu"
-                value={password}
-                onChangeText={(text) => { setPassword(text); setPasswordError(""); }}
-                secureTextEntry
-              />
-            </View>
-            {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+                <View style={[styles.inputContainer, passwordError ? styles.inputError : null, { marginTop: emailError ? 8 : 16 }]}>
+                  <Ionicons name="lock-closed-outline" size={20} color={passwordError ? "#ef4444" : "#64748b"} style={styles.inputIcon} />
+                  <TextInput style={styles.input} placeholder="Mật khẩu" value={password} onChangeText={(t) => { setPassword(t); setPasswordError(""); }} secureTextEntry />
+                </View>
+                {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
 
-            <View style={[styles.inputContainer, confirmError ? styles.inputError : null, { marginTop: passwordError ? 8 : 16 }]}>
-              <Ionicons name="shield-checkmark-outline" size={20} color={confirmError ? "#ef4444" : "#64748b"} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Xác nhận mật khẩu"
-                value={confirmPassword}
-                onChangeText={(text) => { setConfirmPassword(text); setConfirmError(""); }}
-                secureTextEntry
-              />
-            </View>
-            {confirmError ? <Text style={styles.errorText}>{confirmError}</Text> : null}
+                <View style={[styles.inputContainer, confirmError ? styles.inputError : null, { marginTop: passwordError ? 8 : 16 }]}>
+                  <Ionicons name="shield-checkmark-outline" size={20} color={confirmError ? "#ef4444" : "#64748b"} style={styles.inputIcon} />
+                  <TextInput style={styles.input} placeholder="Xác nhận mật khẩu" value={confirmPassword} onChangeText={(t) => { setConfirmPassword(t); setConfirmError(""); }} secureTextEntry />
+                </View>
+                {confirmError ? <Text style={styles.errorText}>{confirmError}</Text> : null}
 
-            <TouchableOpacity
-              style={[styles.registerBtn, loading && styles.registerBtnDisabled, { marginTop: confirmError ? 24 : 32 }]}
-              onPress={handleRegister}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.registerBtnText}>Đăng ký</Text>
-              )}
-            </TouchableOpacity>
+                <TouchableOpacity style={[styles.registerBtn, loading && styles.registerBtnDisabled, { marginTop: confirmError ? 24 : 32 }]} onPress={handleSendOtp} disabled={loading}>
+                  {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.registerBtnText}>Gửi mã xác thực</Text>}
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View style={[styles.inputContainer, otpError ? styles.inputError : null]}>
+                  <Ionicons name="keypad-outline" size={20} color={otpError ? "#ef4444" : "#64748b"} style={styles.inputIcon} />
+                  <TextInput
+                    style={[styles.input, styles.otpInput]}
+                    placeholder="Nhập mã 6 số"
+                    value={otp}
+                    onChangeText={(t) => { setOtp(t.replace(/\D/g, "").slice(0, 6)); setOtpError(""); }}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                  />
+                </View>
+                {otpError ? <Text style={styles.errorText}>{otpError}</Text> : null}
+
+                <TouchableOpacity style={[styles.registerBtn, loading && styles.registerBtnDisabled, { marginTop: 24 }]} onPress={handleRegister} disabled={loading}>
+                  {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.registerBtnText}>Xác nhận & Đăng ký</Text>}
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.resendBtn} onPress={handleSendOtp} disabled={loading}>
+                  <Text style={styles.resendText}>Gửi lại mã OTP</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.backBtn} onPress={() => { setStep("form"); setOtp(""); setOtpError(""); }}>
+                  <Ionicons name="arrow-back" size={16} color="#64748b" />
+                  <Text style={styles.backText}>Sửa thông tin</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
 
-          <TouchableOpacity 
-            style={styles.footer}
-            onPress={() => router.replace({ pathname: "/(auth)/login", params: { role: params.role } })}
-          >
-            <Text style={styles.footerText}>
-              Đã có tài khoản? <Text style={styles.footerLink}>Đăng nhập</Text>
-            </Text>
+          <TouchableOpacity style={styles.footer} onPress={() => router.replace({ pathname: "/(auth)/login", params: { role: params.role } })}>
+            <Text style={styles.footerText}>Đã có tài khoản? <Text style={styles.footerLink}>Đăng nhập</Text></Text>
           </TouchableOpacity>
 
         </ScrollView>
@@ -180,9 +176,14 @@ const styles = StyleSheet.create({
   errorText: { color: "#ef4444", fontSize: 12, fontWeight: "600", marginTop: 4, marginLeft: 4 },
   inputIcon: { marginRight: 12 },
   input: { flex: 1, fontSize: 16, color: "#1e293b" },
+  otpInput: { fontSize: 24, fontWeight: "700", letterSpacing: 8, textAlign: "center" },
   registerBtn: { backgroundColor: "#2E7D32", height: 60, borderRadius: 16, justifyContent: "center", alignItems: "center", shadowColor: "#2E7D32", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 12, elevation: 5 },
   registerBtnDisabled: { opacity: 0.7 },
   registerBtnText: { color: "#FFFFFF", fontSize: 18, fontWeight: "bold" },
+  resendBtn: { marginTop: 16, alignItems: "center" },
+  resendText: { color: "#2E7D32", fontWeight: "600" },
+  backBtn: { marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+  backText: { color: "#64748b", fontSize: 14 },
   footer: { alignItems: "center" },
   footerText: { color: "#64748b", fontSize: 15 },
   footerLink: { color: "#2E7D32", fontWeight: "bold" },

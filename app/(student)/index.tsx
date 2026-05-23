@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  SafeAreaView, 
-  ScrollView, 
-  TouchableOpacity, 
-  Image, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  Image,
   useWindowDimensions,
   ImageBackground,
   Dimensions,
@@ -15,7 +15,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import client, { BASE_URL } from "../../src/api/client";
+import client, { BASE_URL, resolveImageUrl } from "../../src/api/client";
 import { io } from "socket.io-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert } from "react-native";
@@ -31,6 +31,7 @@ export default function StudentHome() {
   const [featuredCategories, setFeaturedCategories] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [missions, setMissions] = useState<any[]>([]);
+  const [hasClass, setHasClass] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const handleClaimMission = async (missionId: string, xpReward: number, gemReward: number = 0) => {
@@ -46,7 +47,22 @@ export default function StudentHome() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchData();
+      const loadWithCache = async () => {
+        try {
+          const cached = await AsyncStorage.getItem("student_home_cache");
+          if (cached) {
+            const { userData: u, lessons: l, featuredCategories: fc, leaderboard: lb, missions: m } = JSON.parse(cached);
+            if (u) setUserData(u);
+            if (l) setLessons(l);
+            if (fc) setFeaturedCategories(fc);
+            if (lb) setLeaderboard(lb);
+            if (m) setMissions(m);
+            setLoading(false);
+          }
+        } catch (_) {}
+        fetchData();
+      };
+      void loadWithCache();
     }, [])
   );
 
@@ -63,22 +79,35 @@ export default function StudentHome() {
 
   const fetchData = async () => {
     try {
-      setLoading(true);
-      const [profileRes, lessonsRes, rankRes, missionsRes] = await Promise.all([
+      if (!userData) setLoading(true);
+      const [profileRes, lessonsRes, rankRes, missionsRes, classesRes] = await Promise.allSettled([
         client.get("/auth/profile"),
         client.get("/lessons/for-student"),
         client.get("/users/leaderboard?type=SCHOOL"),
-        client.get("/missions")
+        client.get("/missions"),
+        client.get("/classes/my-classes"),
       ]);
-      
-      const user = profileRes.data;
-      const categoriesRes = await client.get(`/categories/featured?userId=${user._id}`);
-      
-      setUserData(profileRes.data);
-      setLessons(lessonsRes.data);
-      setFeaturedCategories(categoriesRes.data);
-      setLeaderboard(rankRes.data.slice(0, 3));
-      setMissions(missionsRes.data);
+
+      const user = profileRes.status === 'fulfilled' ? profileRes.value.data : userData;
+      if (!user) return;
+
+      const categoriesRes = await client.get(`/categories/featured?userId=${user._id}`).catch(() => ({ data: [] }));
+
+      if (profileRes.status === 'fulfilled') setUserData(user);
+      if (lessonsRes.status === 'fulfilled') setLessons(lessonsRes.value.data || []);
+      setFeaturedCategories(categoriesRes.data || []);
+      if (rankRes.status === 'fulfilled') setLeaderboard((rankRes.value.data || []).slice(0, 3));
+      if (missionsRes.status === 'fulfilled') setMissions(missionsRes.value.data || []);
+      if (classesRes.status === 'fulfilled') setHasClass((classesRes.value.data || []).length > 0);
+
+      // Save to cache
+      await AsyncStorage.setItem("student_home_cache", JSON.stringify({
+        userData: user,
+        lessons: lessonsRes.status === 'fulfilled' ? lessonsRes.value.data : lessons,
+        featuredCategories: categoriesRes.data,
+        leaderboard: rankRes.status === 'fulfilled' ? rankRes.value.data.slice(0, 3) : leaderboard,
+        missions: missionsRes.status === 'fulfilled' ? missionsRes.value.data : missions,
+      }));
     } catch (e) {
       console.error("Failed to fetch home data", e);
     } finally {
@@ -123,7 +152,7 @@ export default function StudentHome() {
       const equippedAvatar = userData?.equippedItems?.avatarId;
       const equippedFrame = userData?.equippedItems?.frameId;
       
-      const avatarUrl = equippedAvatar?.imageUrl || "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
+      const avatarUrl = resolveImageUrl(equippedAvatar?.imageUrl || userData?.avatar || "https://cdn-icons-png.flaticon.com/512/3135/3135715.png");
       
       return (
         <View style={styles.avatarContainer}>
@@ -133,7 +162,7 @@ export default function StudentHome() {
           />
           {equippedFrame && (
               <Image 
-                source={{ uri: equippedFrame.imageUrl }} 
+                source={{ uri: resolveImageUrl(equippedFrame.imageUrl) }} 
                 style={styles.frameImage} 
                 resizeMode="contain"
               />
@@ -180,10 +209,10 @@ export default function StudentHome() {
           <Text style={styles.greetingSubtitle}>{t('what_to_learn')}</Text>
         </View>
 
-        {/* Continue Learning */}
-        {(() => {
+        {/* Continue Learning — chỉ hiện khi đã có lớp */}
+        {hasClass && (() => {
           const lastLesson = lessons.find(l => l._id === userData?.lastLessonId) || lessons[0];
-          const isCompleted = userData?.completedLessons?.some((l: any) => 
+          const isCompleted = userData?.completedLessons?.some((l: any) =>
             (typeof l === 'string' ? l === lastLesson?._id : l.lessonId === lastLesson?._id)
           );
           if (!lastLesson || isCompleted) return null;
@@ -196,7 +225,7 @@ export default function StudentHome() {
                 onPress={() => router.push({ pathname: "/lesson/[id]", params: { id: lastLesson._id } })}
               >
                 <Image 
-                  source={{ uri: lastLesson.imageUrl?.trim() || "https://images.unsplash.com/photo-1528127269322-539801943592?q=80&w=400" }} 
+                  source={{ uri: resolveImageUrl(lastLesson.imageUrl) || "https://images.unsplash.com/photo-1528127269322-539801943592?q=80&w=400" }} 
                   style={styles.continueImg} 
                 />
                 <View style={styles.continueInfo}>
@@ -205,7 +234,7 @@ export default function StudentHome() {
                   </Text>
                   <View style={styles.progressRow}>
                     <Text style={styles.progressLabel}>{t('progress') || "Tiến độ"}</Text>
-                    <Text style={styles.progressPercent}>{t('learning') || "Đang học"}</Text>
+                    <Text style={styles.progressPercent}>{t('learning_status') || "Đang học"}</Text>
                   </View>
                   <View style={styles.progressBarBg}>
                     <View style={[styles.progressBarFill, { width: '30%' }]} />
@@ -287,8 +316,8 @@ export default function StudentHome() {
           </View>
         </View>
 
-        {/* Challenge Banner */}
-        {(() => {
+        {/* Challenge Banner — chỉ hiện khi đã có lớp */}
+        {hasClass && (() => {
           const uncompletedLessons = lessons.filter(l => 
             !userData?.completedLessons?.some((cl: any) => 
               (typeof cl === 'string' ? cl === l._id : cl.lessonId === l._id)
@@ -307,7 +336,7 @@ export default function StudentHome() {
               onPress={() => router.push({ pathname: "/lesson/[id]", params: { id: featuredLesson._id } })}
             >
                 <ImageBackground 
-                    source={{ uri: featuredLesson.imageUrl?.trim() || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=600' }}
+                    source={{ uri: resolveImageUrl(featuredLesson.imageUrl) || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=600' }}
                     style={styles.challengeBg}
                     imageStyle={{ borderRadius: 24 }}
                 >
@@ -333,32 +362,49 @@ export default function StudentHome() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>{t('featured_topics') || "Chủ đề nổi bật"}</Text>
-            <TouchableOpacity onPress={() => router.push("/(student)/all-categories")}>
-              <Text style={styles.seeAll}>{t('see_all')}</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
-            contentContainerStyle={styles.topicsScroll}
-          >
-            {featuredCategories.map((cat) => (
-              <TouchableOpacity 
-                key={cat._id} 
-                style={styles.categoryCard}
-                onPress={() => router.push({ pathname: "/category/[id]", params: { id: cat._id, name: cat.name } })}
-              >
-                <Image 
-                  source={{ uri: cat.imageUrl?.trim() || "https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=400" }} 
-                  style={styles.categoryImg} 
-                />
-                <View style={styles.categoryOverlay}>
-                  <Text style={styles.categoryTitle} numberOfLines={1}>{cat.name}</Text>
-                </View>
+            {featuredCategories.length > 0 && (
+              <TouchableOpacity onPress={() => router.push("/(student)/all-categories")}>
+                <Text style={styles.seeAll}>{t('see_all')}</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
+            )}
+          </View>
+
+          {featuredCategories.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.topicsScroll}
+            >
+              {featuredCategories.map((cat) => (
+                <TouchableOpacity
+                  key={cat._id}
+                  style={styles.categoryCard}
+                  onPress={() => router.push({ pathname: "/category/[id]", params: { id: cat._id, name: cat.name } })}
+                >
+                  <Image
+                    source={{ uri: resolveImageUrl(cat.imageUrl) || "https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=400" }}
+                    style={styles.categoryImg}
+                  />
+                  <View style={styles.categoryOverlay}>
+                    <Text style={styles.categoryTitle} numberOfLines={1}>{cat.name}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.emptyTopicsBox}>
+              <Ionicons name="school-outline" size={32} color="#D1D5DB" />
+              <Text style={styles.emptyTopicsText}>
+                {t('join_class_to_see_topics') || "Tham gia lớp học để xem chủ đề nổi bật"}
+              </Text>
+              <TouchableOpacity
+                style={styles.joinClassBtn}
+                onPress={() => router.push("/(student)/classroom")}
+              >
+                <Text style={styles.joinClassBtnText}>{t('join_class') || "Tham gia lớp học"}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
       </ScrollView>
@@ -479,4 +525,8 @@ const styles = StyleSheet.create({
   claimBtnText: { color: "#FFF", fontSize: 12, fontWeight: "bold" },
   claimedBadge: { flexDirection: "row", alignItems: "center", gap: 4 },
   claimedText: { color: "#10B981", fontSize: 13, fontWeight: "bold" },
+  emptyTopicsBox: { backgroundColor: "#FFFBEB", borderRadius: 20, borderWidth: 1, borderColor: "#FEF9C3", padding: 24, alignItems: "center", gap: 10 },
+  emptyTopicsText: { fontSize: 13, color: "#9CA3AF", textAlign: "center", lineHeight: 20 },
+  joinClassBtn: { backgroundColor: "#2E7D32", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, marginTop: 4 },
+  joinClassBtnText: { color: "#FFF", fontSize: 13, fontWeight: "bold" },
 });

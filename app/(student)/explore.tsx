@@ -1,17 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TextInput, TouchableOpacity, Image, useWindowDimensions, Dimensions, FlatList } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TextInput, TouchableOpacity, Image, Dimensions, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { useRouter, useFocusEffect } from "expo-router";
-import client from "../../src/api/client";
-import { useTranslation } from "../../src/context/LanguageContext";
-import { ActivityIndicator } from "react-native";
+import client, { resolveImageUrl } from "../../src/api/client";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export default function ExploreScreen() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
-  const { t } = useTranslation();
   const [activeFilter, setActiveFilter] = useState("Tất cả");
   const [searchQuery, setSearchQuery] = useState("");
   const [userData, setUserData] = useState<any>(null);
@@ -20,7 +16,7 @@ export default function ExploreScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchData();
+      void fetchData();
     }, [])
   );
 
@@ -30,7 +26,7 @@ export default function ExploreScreen() {
         client.get("/auth/profile"),
         client.get("/categories/for-student")
       ]);
-      
+
       setUserData(profileRes.data);
       setCategories(catRes.data);
     } catch (e) {
@@ -124,7 +120,7 @@ export default function ExploreScreen() {
                   onPress={() => router.push({ pathname: "/category/[id]", params: { id: cat._id, name: cat.name } })}
                 >
                   <Image 
-                    source={{ uri: cat.imageUrl || "https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=400" }} 
+                    source={{ uri: resolveImageUrl(cat.imageUrl) || "https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=400" }}
                     style={styles.catImg} 
                   />
                   <View style={styles.catInfo}>

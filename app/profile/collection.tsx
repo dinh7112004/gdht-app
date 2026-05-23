@@ -63,11 +63,20 @@ export default function CollectionScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2E7D32" />
         </View>
+      ) : collections.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <Ionicons name="school-outline" size={48} color="#D1D5DB" />
+          <Text style={styles.emptyTitle}>Chưa có bộ sưu tập nào</Text>
+          <Text style={styles.emptyDesc}>Tham gia lớp học để bắt đầu thu thập các chủ đề di sản</Text>
+          <TouchableOpacity style={styles.joinBtn} onPress={() => router.push("/(student)/classroom")}>
+            <Text style={styles.joinBtnText}>Tham gia lớp học</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <ScrollView contentContainerStyle={styles.grid}>
           {filteredCollections.map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
+            <TouchableOpacity
+              key={item.id}
               style={styles.collectionCard}
               onPress={() => router.push({
                 pathname: `/category/${item.id}`,
@@ -84,11 +93,6 @@ export default function CollectionScreen() {
               </View>
             </TouchableOpacity>
           ))}
-          {filteredCollections.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Chưa có dữ liệu cho mục này</Text>
-            </View>
-          )}
         </ScrollView>
       )}
     </SafeAreaView>
@@ -113,6 +117,9 @@ const styles = StyleSheet.create({
   progressTrack: { height: 4, backgroundColor: "#F1F5F9", borderRadius: 2 },
   progressFill: { height: "100%", backgroundColor: "#4CAF50", borderRadius: 2 },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyContainer: { width: width - 32, padding: 40, alignItems: 'center' },
-  emptyText: { color: '#94a3b8', fontWeight: 'bold' }
+  emptyBox: { flex: 1, justifyContent: "center", alignItems: "center", padding: 40, gap: 12 },
+  emptyTitle: { fontSize: 18, fontWeight: "800", color: "#374151" },
+  emptyDesc: { fontSize: 14, color: "#9CA3AF", textAlign: "center", lineHeight: 22 },
+  joinBtn: { backgroundColor: "#2E7D32", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14, marginTop: 8 },
+  joinBtnText: { color: "#FFF", fontSize: 14, fontWeight: "bold" },
 });

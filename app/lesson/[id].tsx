@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Image, TouchableOpacity, ActivityIndicator, useWindowDimensions, Dimensions } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import client from "../../src/api/client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import client, { resolveImageUrl } from "../../src/api/client";
 import { useTranslation } from "../../src/context/LanguageContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -17,13 +18,24 @@ export default function LessonDetailScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchData();
+    const loadWithCache = async () => {
+      try {
+        const cached = await AsyncStorage.getItem(`lesson_${id}_cache`);
+        if (cached) {
+          const data = JSON.parse(cached);
+          setLesson(data.lesson);
+          setUserData(data.userData);
+          setLoading(false);
+        }
+      } catch (_) {}
+      fetchData();
+    };
+    void loadWithCache();
   }, [id]);
 
   const fetchData = async () => {
     if (!id || id === "undefined") return;
     try {
-      setLoading(true);
       const [lessonRes, profileRes] = await Promise.all([
         client.get(`/lessons/${id}`),
         client.get("/auth/profile"),
@@ -31,6 +43,10 @@ export default function LessonDetailScreen() {
       ]);
       setLesson(lessonRes.data);
       setUserData(profileRes.data);
+      await AsyncStorage.setItem(`lesson_${id}_cache`, JSON.stringify({
+        lesson: lessonRes.data,
+        userData: profileRes.data,
+      }));
     } catch (e) {
       console.error("Failed to fetch lesson detail", e);
     } finally {
@@ -84,7 +100,7 @@ export default function LessonDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Main Image */}
         <Image 
-          source={{ uri: lesson?.imageUrl?.trim() || "https://images.unsplash.com/photo-1599708137303-90432773295c?q=80&w=800" }} 
+          source={{ uri: resolveImageUrl(lesson?.imageUrl) || "https://images.unsplash.com/photo-1599708137303-90432773295c?q=80&w=800" }}
           style={styles.mainImg} 
         />
 

@@ -1,10 +1,51 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { Platform } from "react-native";
+import { Platform, View, Text, StyleSheet } from "react-native";
+import { useEffect, useState } from "react";
+import client from "../../src/api/client";
+
+function UnreadBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <View style={badge.dot}>
+      <Text style={badge.text}>{count > 9 ? "9+" : count}</Text>
+    </View>
+  );
+}
+
+const badge = StyleSheet.create({
+  dot: {
+    position: "absolute",
+    top: -4,
+    right: -8,
+    backgroundColor: "#EF4444",
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 3,
+  },
+  text: { color: "#fff", fontSize: 9, fontWeight: "bold" },
+});
 
 export default function TeacherLayout() {
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const res = await client.get<{ count: number }>("/chat/unread-count");
+        setUnreadCount(res.data.count || 0);
+      } catch (_) {}
+    };
+    void fetchUnread();
+    const interval = setInterval(() => void fetchUnread(), 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <Tabs screenOptions={{ 
+    <Tabs screenOptions={{
       headerShown: false,
       tabBarActiveTintColor: "#2E7D32",
       tabBarInactiveTintColor: "#94a3b8",
@@ -45,17 +86,24 @@ export default function TeacherLayout() {
           ),
         }}
       />
-      <Tabs.Screen 
-        name="ai" 
+      <Tabs.Screen
+        name="chat"
         options={{
-          tabBarLabel: "AI",
+          tabBarLabel: "Tin nhắn",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "sparkles" : "sparkles-outline"} size={24} color={color} />
+            <View>
+              <Ionicons name={focused ? "chatbubble" : "chatbubble-outline"} size={24} color={color} />
+              <UnreadBadge count={unreadCount} />
+            </View>
           ),
         }}
       />
-      <Tabs.Screen 
-        name="profile" 
+      <Tabs.Screen
+        name="ai"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="profile"
         options={{
           tabBarLabel: "Hồ sơ",
           tabBarIcon: ({ color, focused }) => (

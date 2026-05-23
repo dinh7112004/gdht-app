@@ -2,12 +2,17 @@
   "expo": {
     "name": "Giáo dục Di sản",
     "slug": "gdds-toanhoc",
+    "owner": "dinh2004",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/role_student.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "scheme": "gdds-toanhoc",
+    "scheme": [
+      "gdds-toanhoc",
+      "com.googleusercontent.apps.1049087471983-5padaqumsq2i4vgm5td3nvbgadiockjl",
+      "fb998156762578184"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.giaoduchoctap",
@@ -23,7 +28,8 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-web-browser"
     ],
     "extra": {
       "router": {},

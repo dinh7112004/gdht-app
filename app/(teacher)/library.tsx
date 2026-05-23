@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import client, { BASE_URL, resolveImageUrl } from "../../src/api/client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -46,40 +47,56 @@ function LibraryView() {
   const [modalVisible, setModalVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   
+  const [classes, setClasses] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     imageUrl: "",
-    subject: "Toán học",
-    isPublic: true
+    subject: "",
+    isPublic: false,
+    targetClassIds: [] as string[]
   });
 
   useEffect(() => {
-    fetchCategories();
-    fetchSubjects();
+    const loadWithCache = async () => {
+      try {
+        const cached = await AsyncStorage.getItem("teacher_library_cache");
+        if (cached) {
+          const data = JSON.parse(cached);
+          setCategories(data.categories || []);
+          setLoading(false);
+        }
+      } catch (_) {}
+      fetchCategories();
+      fetchSubjects();
+      fetchClasses();
+    };
+    void loadWithCache();
   }, []);
+
+  const fetchClasses = async () => {
+    try {
+      const res = await client.get("/classes/my-classes");
+      setClasses(res.data || []);
+    } catch (error) {
+      console.error("Failed to fetch classes", error);
+    }
+  };
 
   const fetchSubjects = async () => {
     try {
       const res = await client.get("/subjects");
-      if (res.data && res.data.length > 0) {
-        setSubjects(res.data);
+      const data = res.data || [];
+      setSubjects(data);
+      if (data.length > 0) {
+        setFormData(prev => ({ ...prev, subject: data[0].name }));
       } else {
-        // Fallback nếu chưa có data trong DB
-        setSubjects([
-          { name: "Toán học" }, { name: "Ngữ văn" }, { name: "Lịch sử" }, 
-          { name: "Địa lý" }, { name: "Khoa học" }, { name: "Tiếng Anh" }, 
-          { name: "Văn hóa" }, { name: "Nghệ thuật" }
-        ]);
+        setFormData(prev => ({ ...prev, subject: "" }));
       }
     } catch (error) {
       console.error("Failed to fetch subjects", error);
-      // Fallback
-      setSubjects([
-        { name: "Toán học" }, { name: "Ngữ văn" }, { name: "Lịch sử" }, 
-        { name: "Địa lý" }, { name: "Khoa học" }, { name: "Tiếng Anh" }, 
-        { name: "Văn hóa" }, { name: "Nghệ thuật" }
-      ]);
+      setSubjects([]);
+      setFormData(prev => ({ ...prev, subject: "" }));
     }
   };
 
@@ -87,6 +104,7 @@ function LibraryView() {
     try {
       const res = await client.get("/categories");
       setCategories(res.data);
+      await AsyncStorage.setItem("teacher_library_cache", JSON.stringify({ categories: res.data }));
     } catch (error) {
       console.error("Failed to fetch categories", error);
     } finally {
@@ -152,8 +170,9 @@ function LibraryView() {
         name: "",
         description: "",
         imageUrl: "",
-        subject: "Toán học",
-        isPublic: true
+        subject: subjects[0]?.name || "",
+        isPublic: false,
+        targetClassIds: []
       });
       fetchCategories();
       Alert.alert("Thành công", "Đã tạo chủ đề mới!");
@@ -303,7 +322,12 @@ function LibraryView() {
                 <View style={styles.formGroup}>
                   <Text style={styles.inputLabel}>Môn học</Text>
                   <View style={styles.pickerContainer}>
-                    {subjects.map((s) => (
+                    {subjects.length === 0 && (
+                    <Text style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>
+                      Chưa có môn học nào. Vui lòng tạo môn học trên web trước.
+                    </Text>
+                  )}
+                  {subjects.map((s) => (
                       <TouchableOpacity 
                         key={s.name} 
                         style={[styles.pickerItem, formData.subject === s.name && styles.pickerItemActive]}
@@ -324,6 +348,42 @@ function LibraryView() {
                     value={formData.description}
                     onChangeText={(val) => setFormData({...formData, description: val})}
                   />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.inputLabel}>Gán cho lớp học</Text>
+                  {classes.length === 0 ? (
+                    <Text style={{ fontSize: 13, color: '#94a3b8', fontStyle: 'italic' }}>
+                      Bạn chưa có lớp học nào.
+                    </Text>
+                  ) : (
+                    <View style={styles.pickerContainer}>
+                      {classes.map((cls) => {
+                        const selected = formData.targetClassIds.includes(cls._id);
+                        return (
+                          <TouchableOpacity
+                            key={cls._id}
+                            style={[styles.pickerItem, selected && styles.pickerItemActive]}
+                            onPress={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                targetClassIds: selected
+                                  ? prev.targetClassIds.filter(id => id !== cls._id)
+                                  : [...prev.targetClassIds, cls._id]
+                              }));
+                            }}
+                          >
+                            <Text style={[styles.pickerItemText, selected && styles.pickerItemTextActive]}>
+                              {cls.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                  <Text style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
+                    Không chọn lớp = công khai toàn trường
+                  </Text>
                 </View>
 
                 <TouchableOpacity 

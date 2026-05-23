@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Ima
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import client from "../../src/api/client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -17,14 +18,25 @@ export default function ClassListScreen() {
   const [createLoading, setCreateLoading] = useState(false);
 
   useEffect(() => {
-    fetchClasses();
+    const loadWithCache = async () => {
+      try {
+        const cached = await AsyncStorage.getItem("teacher_class_list_cache");
+        if (cached) {
+          const data = JSON.parse(cached);
+          setClasses(data.classes || []);
+          setLoading(false);
+        }
+      } catch (_) {}
+      fetchClasses();
+    };
+    void loadWithCache();
   }, []);
 
   const fetchClasses = async () => {
     try {
-      setLoading(true);
       const res = await client.get("/classes/my-classes");
       setClasses(res.data);
+      await AsyncStorage.setItem("teacher_class_list_cache", JSON.stringify({ classes: res.data }));
     } catch (error) {
       console.error("Failed to fetch classes", error);
     } finally {

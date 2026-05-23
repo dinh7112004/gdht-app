@@ -15,7 +15,7 @@ export default function ClassDetailScreen() {
   const [classData, setClassData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState('students');
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     fetchClassDetail();
@@ -57,6 +57,17 @@ export default function ClassDetailScreen() {
   const [lessonModalVisible, setLessonModalVisible] = useState(false);
   const [lessons, setLessons] = useState<any[]>([]);
 
+  // Completion stats modal
+  const [completionModal, setCompletionModal] = useState<{
+    visible: boolean;
+    lessonTitle: string;
+    lessonId: string;
+    completed: any[];
+    notCompleted: any[];
+    loading: boolean;
+    tab: 'done' | 'notDone';
+  }>({ visible: false, lessonTitle: '', lessonId: '', completed: [], notCompleted: [], loading: false, tab: 'done' });
+
   useEffect(() => {
     if ((categoryModalVisible || createAssignmentModalVisible) && categories.length === 0) fetchCategories();
   }, [categoryModalVisible, createAssignmentModalVisible]);
@@ -77,6 +88,16 @@ export default function ClassDetailScreen() {
       const res = await client.get('/lessons');
       setLessons(res.data);
     } catch (error) { }
+  };
+
+  const openCompletionModal = async (lesson: any) => {
+    setCompletionModal(prev => ({ ...prev, visible: true, lessonTitle: lesson.title, lessonId: lesson._id, loading: true, completed: [], notCompleted: [], tab: 'done' }));
+    try {
+      const res = await client.get(`/classes/${id}/lessons/${lesson._id}/completion`);
+      setCompletionModal(prev => ({ ...prev, loading: false, completed: res.data.completed || [], notCompleted: res.data.notCompleted || [] }));
+    } catch {
+      setCompletionModal(prev => ({ ...prev, loading: false }));
+    }
   };
 
   const handleToggleFeatured = async (lesson: any) => {
@@ -422,7 +443,7 @@ export default function ClassDetailScreen() {
 
           <View style={[styles.newStatCard, { borderLeftColor: '#8B5CF6', borderLeftWidth: 4 }]}>
             <Text style={[styles.newStatLabel, { color: '#8B5CF6' }]}>Bài nộp đủ</Text>
-            <Text style={[styles.newStatValue, { color: '#8B5CF6' }]}>{Math.floor((classData?.studentIds?.length || 0) * 0.8)}</Text>
+            <Text style={[styles.newStatValue, { color: '#8B5CF6' }]}>{classData?.fullySubmittedCount ?? 0}</Text>
           </View>
         </View>
 
@@ -432,8 +453,8 @@ export default function ClassDetailScreen() {
             <>
               <Text style={styles.newSectionTitle}>Bài tập gần đây</Text>
               {classData?.assignedLessons?.map((lesson: any) => {
-                // Tính toán số lượng học sinh đã làm bài (nếu có dữ liệu, mặc định là 0)
-                const submittedCount = lesson.completedStudentIds?.length || 0;
+                // Số học sinh đã hoàn thành bài này (từ backend)
+                const submittedCount = lesson.submittedCount || 0;
                 const totalStudents = classData?.studentIds?.length || 0;
 
                 // Giả định hạn nộp được lưu trong bài giảng hoặc mặc định là 7 ngày sau khi giao
@@ -445,7 +466,8 @@ export default function ClassDetailScreen() {
                     title={lesson.title}
                     dueDate={deadline}
                     submitted={`${submittedCount}/${totalStudents}`}
-                    img={lesson.imageUrl || "https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=400"}
+                    img={resolveImageUrl(lesson.imageUrl) || "https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=400"}
+                    onPress={() => openCompletionModal(lesson)}
                   />
                 );
               })}
@@ -476,13 +498,14 @@ export default function ClassDetailScreen() {
                       key={lesson._id}
                       title={lesson.title}
                       category={lesson.category || "Bài lẻ"}
-                      img={lesson.imageUrl || "https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=400"}
+                      img={resolveImageUrl(lesson.imageUrl) || "https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=400"}
                       isAssigned={isAssigned}
                       isFeatured={isFeatured}
                       onAssign={() => isAssigned ? handleUnassignLesson(lesson._id) : handleAssignLesson(lesson._id)}
                       onToggleFeatured={() => handleToggleFeatured(lesson)}
                       onEdit={() => handleEditLesson(lesson)}
                       onDelete={() => handleDeleteLesson(lesson._id)}
+                      onStats={isAssigned ? () => openCompletionModal(lesson) : undefined}
                     />
                   );
                 })}
@@ -501,7 +524,7 @@ export default function ClassDetailScreen() {
                   key={student._id}
                   name={student.fullName}
                   email={student.email}
-                  onPress={() => router.push({ pathname: "/(teacher)/student/[id]", params: { id: student._id } })}
+                  onPress={() => router.push({ pathname: "/(teacher)/student/[id]", params: { id: student._id, name: student.fullName, avatar: student.avatar || "" } })}
                 />
               ))}
             </View>
@@ -742,6 +765,79 @@ export default function ClassDetailScreen() {
         </View>
       </Modal>
 
+      {/* Completion Stats Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={completionModal.visible}
+        onRequestClose={() => setCompletionModal(prev => ({ ...prev, visible: false }))}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={styles.modalTitle} numberOfLines={2}>{completionModal.lessonTitle}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setCompletionModal(prev => ({ ...prev, visible: false }))}>
+                <Ionicons name="close" size={28} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Tab switcher */}
+            <View style={completionStyles.tabRow}>
+              <TouchableOpacity
+                style={[completionStyles.tabBtn, completionModal.tab === 'done' && completionStyles.tabBtnActive]}
+                onPress={() => setCompletionModal(prev => ({ ...prev, tab: 'done' }))}
+              >
+                <Ionicons name="checkmark-circle" size={16} color={completionModal.tab === 'done' ? '#fff' : '#10B981'} />
+                <Text style={[completionStyles.tabBtnText, completionModal.tab === 'done' && { color: '#fff' }]}>
+                  Đã làm ({completionModal.completed.length})
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[completionStyles.tabBtn, completionModal.tab === 'notDone' && completionStyles.tabBtnActiveRed]}
+                onPress={() => setCompletionModal(prev => ({ ...prev, tab: 'notDone' }))}
+              >
+                <Ionicons name="time-outline" size={16} color={completionModal.tab === 'notDone' ? '#fff' : '#EF4444'} />
+                <Text style={[completionStyles.tabBtnText, { color: completionModal.tab === 'notDone' ? '#fff' : '#EF4444' }]}>
+                  Chưa làm ({completionModal.notCompleted.length})
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {completionModal.loading ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#2E7D32" />
+              </View>
+            ) : (
+              <ScrollView style={{ marginTop: 8 }} showsVerticalScrollIndicator={false}>
+                {(completionModal.tab === 'done' ? completionModal.completed : completionModal.notCompleted).length === 0 ? (
+                  <View style={completionStyles.emptyBox}>
+                    <Text style={completionStyles.emptyText}>
+                      {completionModal.tab === 'done' ? 'Chưa có học sinh nào hoàn thành' : 'Tất cả học sinh đã hoàn thành!'}
+                    </Text>
+                  </View>
+                ) : (
+                  (completionModal.tab === 'done' ? completionModal.completed : completionModal.notCompleted).map((s: any) => (
+                    <View key={s._id} style={completionStyles.studentRow}>
+                      <View style={completionStyles.avatarBox}>
+                        <Text style={completionStyles.avatarText}>{s.fullName?.[0]?.toUpperCase() || 'U'}</Text>
+                      </View>
+                      <Text style={completionStyles.studentName}>{s.fullName}</Text>
+                      <Ionicons
+                        name={completionModal.tab === 'done' ? 'checkmark-circle' : 'ellipse-outline'}
+                        size={20}
+                        color={completionModal.tab === 'done' ? '#10B981' : '#EF4444'}
+                      />
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* Edit Assignment Modal - BẢNG SỬA BÀI GIẢNG */}
       <Modal
         animationType="slide"
@@ -854,12 +950,12 @@ export default function ClassDetailScreen() {
   );
 }
 
-function NewAssignmentItem({ title, dueDate, submitted, img }: any) {
+function NewAssignmentItem({ title, dueDate, submitted, img, onPress }: any) {
   const isExpired = new Date() > new Date(dueDate);
   const formattedDate = new Date(dueDate).toLocaleDateString('vi-VN');
 
   return (
-    <View style={[styles.newHwCard, isExpired && { opacity: 0.8 }]}>
+    <TouchableOpacity style={[styles.newHwCard, isExpired && { opacity: 0.8 }]} onPress={onPress} activeOpacity={0.75}>
       <Image source={{ uri: img }} style={styles.newHwImg} />
       <View style={styles.newHwInfo}>
         <Text style={styles.newHwTitle}>{title}</Text>
@@ -869,8 +965,9 @@ function NewAssignmentItem({ title, dueDate, submitted, img }: any) {
       </View>
       <View style={styles.newHwStatus}>
         <Text style={[styles.newHwSubmittedText, isExpired && { color: '#64748b' }]}>{submitted} nộp</Text>
+        <Text style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>Xem chi tiết</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -883,7 +980,7 @@ function TabItem({ icon, label, active, onPress }: any) {
   );
 }
 
-function ManageLessonItem({ lessonId, title, category, img, isAssigned, isFeatured, onAssign, onToggleFeatured, onEdit, onDelete }: any) {
+function ManageLessonItem({ lessonId, title, category, img, isAssigned, isFeatured, onAssign, onToggleFeatured, onEdit, onDelete, onStats }: any) {
   const router = useRouter();
 
   const handlePress = () => {
@@ -913,7 +1010,12 @@ function ManageLessonItem({ lessonId, title, category, img, isAssigned, isFeatur
         <Text style={styles.hwDate}>{category}</Text>
       </View>
       <View style={styles.hwActions}>
-        <TouchableOpacity onPress={(e: any) => { e.stopPropagation(); onAssign(); }} style={{ marginRight: 15 }}>
+        {onStats && (
+          <TouchableOpacity onPress={(e: any) => { e.stopPropagation(); onStats(); }} style={{ marginRight: 12 }}>
+            <Ionicons name="bar-chart-outline" size={22} color="#3B82F6" />
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity onPress={(e: any) => { e.stopPropagation(); onAssign(); }} style={{ marginRight: 12 }}>
           <Ionicons
             name={isAssigned ? "checkmark-circle" : "add-circle-outline"}
             size={24}
@@ -1043,4 +1145,30 @@ const styles = StyleSheet.create({
   imagePlaceholder: { flex: 1, justifyContent: "center", alignItems: "center" },
   imagePlaceholderText: { fontSize: 14, color: "#94a3b8", fontWeight: "bold", marginTop: 8 },
   uploadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "center", alignItems: "center" },
+});
+
+const completionStyles = StyleSheet.create({
+  tabRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  tabBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 10, borderRadius: 16,
+    backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FEF9C3',
+  },
+  tabBtnActive: { backgroundColor: '#10B981', borderColor: '#10B981' },
+  tabBtnActiveRed: { backgroundColor: '#EF4444', borderColor: '#EF4444' },
+  tabBtnText: { fontSize: 13, fontWeight: '700', color: '#10B981' },
+  studentRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 12, paddingHorizontal: 4,
+    borderBottomWidth: 1, borderBottomColor: '#FEF9C3',
+  },
+  avatarBox: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FEF9C3',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  avatarText: { fontSize: 16, fontWeight: '700', color: '#64748b' },
+  studentName: { flex: 1, fontSize: 15, fontWeight: '600', color: '#1e293b' },
+  emptyBox: { padding: 32, alignItems: 'center' },
+  emptyText: { fontSize: 14, color: '#94a3b8', fontWeight: '600' },
 });

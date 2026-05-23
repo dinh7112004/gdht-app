@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Act
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
-import client from "../../src/api/client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import client, { resolveImageUrl } from "../../src/api/client";
 
 const { width } = Dimensions.get("window");
 
@@ -15,13 +16,25 @@ export default function ClassroomDetailScreen() {
   const [selectedSubject, setSelectedSubject] = useState("Tất cả");
 
   useEffect(() => {
-    fetchClassDetail();
+    const loadWithCache = async () => {
+      try {
+        const cached = await AsyncStorage.getItem(`classroom_${id}_cache`);
+        if (cached) {
+          const data = JSON.parse(cached);
+          setClassData(data.classData);
+          setLoading(false);
+        }
+      } catch (_) {}
+      fetchClassDetail();
+    };
+    void loadWithCache();
   }, [id]);
 
   const fetchClassDetail = async () => {
     try {
       const res = await client.get(`/classes/${id}`);
       setClassData(res.data);
+      await AsyncStorage.setItem(`classroom_${id}_cache`, JSON.stringify({ classData: res.data }));
     } catch (e) {
       console.error("Failed to fetch class detail", e);
     } finally {
@@ -162,7 +175,7 @@ export default function ClassroomDetailScreen() {
                       style={styles.categoryCard}
                       onPress={() => router.push({ pathname: "/category/[id]", params: { id: cat._id, name: cat.name } })}
                     >
-                      <Image source={{ uri: cat.imageUrl }} style={styles.categoryImage} />
+                      <Image source={{ uri: resolveImageUrl(cat.imageUrl) }} style={styles.categoryImage} />
                       <View style={styles.categoryOverlay} />
                       <Text style={styles.categoryName} numberOfLines={2}>{cat.name}</Text>
                     </TouchableOpacity>
@@ -185,7 +198,7 @@ export default function ClassroomDetailScreen() {
                 >
                   <View style={[styles.lessonIcon, { backgroundColor: mainColor + '10' }]}>
                     {lesson.imageUrl ? (
-                      <Image source={{ uri: lesson.imageUrl }} style={styles.lessonImage} />
+                      <Image source={{ uri: resolveImageUrl(lesson.imageUrl) }} style={styles.lessonImage} />
                     ) : (
                       <Ionicons name="book" size={24} color={mainColor} />
                     )}

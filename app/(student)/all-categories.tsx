@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Image, useWindowDimensions, TextInput, Dimensions, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
-import client from "../../src/api/client";
+import client, { resolveImageUrl } from "../../src/api/client";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -16,7 +16,7 @@ export default function AllCategoriesScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchCategories();
+      void fetchCategories();
     }, [])
   );
 
@@ -73,25 +73,38 @@ export default function AllCategoriesScreen() {
         </ScrollView>
       </View>
 
-      <FlatList
-        data={displayedCategories}
-        numColumns={2}
-        keyExtractor={(item) => item._id}
-        contentContainerStyle={styles.list}
-        columnWrapperStyle={styles.row}
-        renderItem={({ item }) => (
-          <TouchableOpacity 
-            style={styles.card}
-            onPress={() => router.push({ pathname: "/category/[id]", params: { id: item._id, name: item.name } })}
-          >
-            <Image source={{ uri: item.imageUrl }} style={styles.img} />
-            <View style={styles.info}>
-              <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
-              <Text style={styles.sub}>Dành riêng cho lớp</Text>
-            </View>
+      {!loading && categories.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <Ionicons name="school-outline" size={48} color="#D1D5DB" />
+          <Text style={styles.emptyTitle}>Chưa có chủ đề nào</Text>
+          <Text style={styles.emptyDesc}>Tham gia lớp học để xem các chủ đề được giáo viên giao</Text>
+          <TouchableOpacity style={styles.joinBtn} onPress={() => router.push("/(student)/classroom")}>
+            <Text style={styles.joinBtnText}>Tham gia lớp học</Text>
           </TouchableOpacity>
-        )}
-      />
+        </View>
+      ) : (
+        <FlatList
+          data={displayedCategories}
+          numColumns={2}
+          keyExtractor={(item) => item._id}
+          contentContainerStyle={styles.list}
+          columnWrapperStyle={styles.row}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => router.push({ pathname: "/category/[id]", params: { id: item._id, name: item.name } })}
+            >
+              <Image source={{ uri: resolveImageUrl(item.imageUrl) }} style={styles.img} />
+              <View style={styles.info}>
+                <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
+                <Text style={styles.lessonCount}>
+                  <Ionicons name="book-outline" size={11} color="#94a3b8" /> {item.lessonCount ?? 0} bài học
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -115,5 +128,10 @@ const styles = StyleSheet.create({
   img: { width: "100%", height: 110, borderRadius: 20 },
   info: { padding: 12 },
   name: { fontSize: 15, fontWeight: "bold", color: "#1e293b" },
-  sub: { fontSize: 12, color: "#94a3b8", marginTop: 4 }
+  lessonCount: { fontSize: 12, color: "#94a3b8", marginTop: 4 },
+  emptyBox: { flex: 1, justifyContent: "center", alignItems: "center", padding: 40, gap: 12 },
+  emptyTitle: { fontSize: 18, fontWeight: "800", color: "#374151" },
+  emptyDesc: { fontSize: 14, color: "#9CA3AF", textAlign: "center", lineHeight: 22 },
+  joinBtn: { backgroundColor: "#2E7D32", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14, marginTop: 8 },
+  joinBtnText: { color: "#FFF", fontSize: 14, fontWeight: "bold" },
 });

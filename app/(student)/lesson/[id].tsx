@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Image, TouchableOpacity, ActivityIndicator, Dimensions } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import client from "../../../src/api/client";
+import client, { resolveImageUrl } from "../../../src/api/client";
 
 const { width } = Dimensions.get("window");
 
@@ -76,7 +76,7 @@ export default function LessonDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Main Image */}
         <Image 
-          source={{ uri: lesson?.imageUrl || "https://images.unsplash.com/photo-1599708137303-90432773295c?q=80&w=800" }} 
+          source={{ uri: resolveImageUrl(lesson?.imageUrl) || "https://images.unsplash.com/photo-1599708137303-90432773295c?q=80&w=800" }} 
           style={styles.mainImg} 
         />
 

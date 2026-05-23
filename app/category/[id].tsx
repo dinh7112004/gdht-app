@@ -45,7 +45,22 @@ export default function CategoryDetailScreen() {
   }, [categoryInfo]);
 
   useEffect(() => {
-    fetchData();
+    // Load cache immediately, then fetch fresh data in background
+    const loadWithCache = async () => {
+      const cacheKey = `category_${id as string}_${name as string}`;
+      try {
+        const cached = await AsyncStorage.getItem(cacheKey);
+        if (cached) {
+          const { categoryInfo: cachedCat, lessons: cachedLessons, userData: cachedUser } = JSON.parse(cached);
+          setCategoryInfo(cachedCat);
+          setLessons(cachedLessons || []);
+          setUserData(cachedUser);
+          setLoading(false); // show cached data immediately
+        }
+      } catch (_) {}
+      fetchData(); // always fetch fresh in background
+    };
+    void loadWithCache();
 
     // Socket.io để cập nhật bài học thời gian thực
     const socket = io(BASE_URL);
@@ -61,36 +76,43 @@ export default function CategoryDetailScreen() {
 
   const fetchData = async () => {
     try {
-      setLoading(true);
-      // Lấy thông tin người dùng từ API trước
+      if (lessons.length === 0) setLoading(true);
+
+      const currentName = (name as string || "").trim();
+
+      // Fetch profile trước để biết role
       const profileRes = await client.get("/auth/profile");
       const user = profileRes.data;
       setUserData(user);
 
       const isStudent = user?.role === 'STUDENT';
-      
-      // Lấy thông tin category trước để lấy ID thật
       const categoriesEndpoint = isStudent ? "/categories/for-student" : "/categories";
-      const categoriesRes = await client.get(categoriesEndpoint);
-      // Tìm category theo ID (id từ params) hoặc theo tên (name từ params)
+      const lessonsEndpoint = isStudent
+        ? `/lessons/for-student?category=${encodeURIComponent(currentName)}&categoryId=${id}`
+        : `/lessons?category=${encodeURIComponent(currentName)}&categoryId=${id}`;
+
+      // Fetch categories + lessons song song
+      const [categoriesRes, lessonsRes] = await Promise.all([
+        client.get(categoriesEndpoint),
+        client.get(lessonsEndpoint),
+      ]);
+
       const currentCat = categoriesRes.data.find((c: any) => c._id === id || c.name === name);
       setCategoryInfo(currentCat);
 
-      // Gửi cả category (tên) và categoryId (ID chuẩn) lên backend
-      const currentName = (name as string || "").trim();
-      const lessonsEndpoint = isStudent 
-        ? `/lessons/for-student?category=${encodeURIComponent(currentName)}&categoryId=${currentCat?._id || id}` 
-        : `/lessons?category=${encodeURIComponent(currentName)}&categoryId=${currentCat?._id || id}`;
-        
-      console.log("[DEBUG] App is fetching lessons from:", lessonsEndpoint);
-      const lessonsRes = await client.get(lessonsEndpoint);
-      console.log(`[DEBUG] App received ${lessonsRes.data?.length} lessons from backend`);
-      setLessons(lessonsRes.data || []);
-      
+      const freshLessons = lessonsRes.data || [];
+      setLessons(freshLessons);
+
+      // Save to cache
+      const cacheKey = `category_${id as string}_${name as string}`;
+      await AsyncStorage.setItem(cacheKey, JSON.stringify({
+        categoryInfo: currentCat,
+        lessons: freshLessons,
+        userData: user,
+      }));
     } catch (e) {
       console.error("[DEBUG] Failed to fetch category lessons:", e);
     } finally {
-      console.log("[DEBUG] Fetch data finally block executed");
       setLoading(false);
     }
   };

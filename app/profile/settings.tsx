@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Switch, Alert, Linking, Modal } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Switch, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -11,8 +11,6 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { t, language } = useTranslation();
   const { soundEnabled, setSoundEnabled, playSound } = useSound();
-  const [showHelpModal, setShowHelpModal] = useState(false);
-
   const handleLogout = () => {
     Alert.alert(
       t('logout_confirm_title'),
@@ -69,7 +67,7 @@ export default function SettingsScreen() {
         </View>
 
         <Text style={styles.sectionTitle}>{t('support_section')}</Text>
-        <SettingItem icon="help-circle" label={t('help_center')} onPress={() => setShowHelpModal(true)} />
+        <SettingItem icon="help-circle" label={t('help_center')} onPress={() => router.push("/profile/help-center")} />
         <SettingItem icon="information-circle" label={t('about_app')} onPress={() => router.push("/profile/about")} />
 
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
@@ -80,42 +78,6 @@ export default function SettingsScreen() {
         <Text style={styles.versionText}>{t('version')} 1.0.5 (Build 20240513)</Text>
       </ScrollView>
 
-      {/* Custom Help Modal */}
-      <Modal visible={showHelpModal} transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-              <View style={styles.helpModalContent}>
-                  <Text style={styles.modalTitle}>{t('help_center')}</Text>
-                  <Text style={styles.modalSubTitle}>{t('help_info')}</Text>
-                  
-                  <TouchableOpacity 
-                    style={styles.modalActionBtn}
-                    onPress={() => {
-                        Linking.openURL("mailto:support@heritagemath.edu.vn");
-                        setShowHelpModal(false);
-                    }}
-                  >
-                      <Ionicons name="mail-outline" size={20} color="#334155" style={{ marginRight: 12 }} />
-                      <Text style={styles.modalActionText}>{t('email_support')}</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.modalActionBtn}
-                    onPress={() => {
-                        // Link Zalo or specific chat URL
-                        Linking.openURL("https://zalo.me/your_number");
-                        setShowHelpModal(false);
-                    }}
-                  >
-                      <Ionicons name="chatbubble-ellipses-outline" size={20} color="#334155" style={{ marginRight: 12 }} />
-                      <Text style={styles.modalActionText}>{t('zalo_support')}</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowHelpModal(false)}>
-                      <Text style={styles.modalCancelText}>{t('cancel')}</Text>
-                  </TouchableOpacity>
-              </View>
-          </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -146,13 +108,4 @@ const styles = StyleSheet.create({
   logoutText: { color: "#EF4444", fontSize: 16, fontWeight: "900" },
   versionText: { textAlign: 'center', color: '#CBD5E1', fontSize: 12, marginTop: 20, fontWeight: '600' },
   
-  // Modal Styles
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  helpModalContent: { backgroundColor: '#FFFDF0', borderRadius: 32, padding: 24, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: '#FEF9C3' },
-  modalTitle: { fontSize: 20, fontWeight: '900', color: '#1e293b', marginBottom: 12 },
-  modalSubTitle: { fontSize: 14, fontWeight: '600', color: '#64748B', textAlign: 'center', marginBottom: 24, lineHeight: 20 },
-  modalActionBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFBEB', width: '100%', padding: 18, borderRadius: 20, marginBottom: 12, borderWidth: 1, borderColor: '#FEF9C3' },
-  modalActionText: { fontSize: 16, fontWeight: '700', color: '#334155' },
-  modalCancelBtn: { width: '100%', padding: 18, alignItems: 'center', marginTop: 8 },
-  modalCancelText: { fontSize: 16, fontWeight: '800', color: '#94A3B8' }
 });

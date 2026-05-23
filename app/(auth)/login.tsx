@@ -1,10 +1,22 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, SafeAreaView, StyleSheet, Image, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, TextInput, TouchableOpacity, SafeAreaView, StyleSheet, Image, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import client from "../../src/api/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as WebBrowser from "expo-web-browser";
+import * as Google from "expo-auth-session/providers/google";
+import * as Facebook from "expo-auth-session/providers/facebook";
+import * as AppleAuthentication from "expo-apple-authentication";
+import { makeRedirectUri } from "expo-auth-session";
+
+WebBrowser.maybeCompleteAuthSession();
+
+// Replace these with your actual OAuth client IDs
+const GOOGLE_IOS_CLIENT_ID = "1049087471983-5padaqumsq2i4vgm5td3nvbgadiockjl.apps.googleusercontent.com";
+const GOOGLE_WEB_CLIENT_ID = "1049087471983-vq3vrhcv8t34k5r13afsfuqdsmm8eqhl.apps.googleusercontent.com";
+const FACEBOOK_APP_ID = "998156762578184";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -13,55 +25,128 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  
-  // Error states
+  const [socialLoading, setSocialLoading] = useState<"google" | "facebook" | "apple" | null>(null);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [generalError, setGeneralError] = useState("");
 
+  const redirectUri = makeRedirectUri({ scheme: "gdds-toanhoc" });
+  console.log("Redirect URI:", redirectUri);
+
+  const [googleRequest, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
+    clientId: GOOGLE_WEB_CLIENT_ID,
+    iosClientId: GOOGLE_IOS_CLIENT_ID,
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+  });
+
+  useEffect(() => {
+    if (googleResponse?.type === "success") {
+      const token = googleResponse.authentication?.idToken || googleResponse.authentication?.accessToken;
+      if (token) {
+        handleSocialLogin("google", token);
+      }
+    }
+  }, [googleResponse]);
+
+  const [facebookRequest, facebookResponse, promptFacebookAsync] = Facebook.useAuthRequest({
+    clientId: FACEBOOK_APP_ID,
+  });
+
+  useEffect(() => {
+    if (facebookResponse?.type === "success" && facebookResponse.authentication?.accessToken) {
+      handleSocialLogin("facebook", facebookResponse.authentication.accessToken);
+    }
+  }, [facebookResponse]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const available = await AppleAuthentication.isAvailableAsync();
+        setAppleAvailable(available);
+      } catch (e) {
+        setAppleAvailable(false);
+      }
+    })();
+  }, []);
+
+  const handleSocialLogin = async (provider: "google" | "facebook" | "apple", token: string) => {
+    setSocialLoading(provider);
+    try {
+      const response = await client.post("/auth/social", {
+        provider,
+        token,
+        role: params.role ?? "STUDENT",
+      });
+      const { access_token, user } = response.data;
+      await AsyncStorage.setItem("userToken", access_token);
+      await AsyncStorage.setItem("userData", JSON.stringify(user));
+      if (user.role === "TEACHER") router.replace("/(teacher)");
+      else router.replace("/(student)");
+    } catch (error: any) {
+      Alert.alert("Lỗi", error.response?.data?.message ?? "Đăng nhập thất bại");
+    } finally {
+      setSocialLoading(null);
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    setSocialLoading("apple");
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      const token = credential.identityToken;
+      if (!token) throw new Error("Không nhận được identity token từ Apple");
+
+      await handleSocialLogin("apple", token);
+    } catch (e: any) {
+      if (e.code === "ERR_CANCELED") {
+        // user cancelled
+      } else {
+        // Apple login not implemented yet — suppress error
+      }
+    } finally {
+      setSocialLoading(null);
+    }
+  };
+
+  const handleGoogleLogin = () => {
+    promptGoogleAsync();
+  };
+
+  const handleFacebookLogin = () => {
+    promptFacebookAsync();
+  };
+
   const handleLogin = async () => {
-    // Reset errors
-    setEmailError("");
-    setPasswordError("");
-    setGeneralError("");
-
+    setEmailError(""); setPasswordError(""); setGeneralError("");
     let hasError = false;
-    if (!email) {
-      setEmailError("Vui lòng nhập email hoặc số điện thoại");
-      hasError = true;
-    }
-    if (!password) {
-      setPasswordError("Vui lòng nhập mật khẩu");
-      hasError = true;
-    }
-
+    if (!email) { setEmailError("Vui lòng nhập email hoặc số điện thoại"); hasError = true; }
+    if (!password) { setPasswordError("Vui lòng nhập mật khẩu"); hasError = true; }
     if (hasError) return;
 
     setLoading(true);
     try {
       const response = await client.post("/auth/login", { email, password });
       const { access_token, user } = response.data;
-
-      // Check if the role matches the selected role
       if (params.role && user.role !== params.role) {
-        setLoading(false);
         const roleName = params.role === "TEACHER" ? "Giáo viên" : "Học sinh";
         const userRoleName = user.role === "TEACHER" ? "Giáo viên" : "Học sinh";
         setGeneralError(`Tài khoản của bạn là ${userRoleName}, không phải ${roleName}.`);
         return;
       }
-      
       await AsyncStorage.setItem("userToken", access_token);
       await AsyncStorage.setItem("userData", JSON.stringify(user));
-
-      if (user.role === "TEACHER") {
-        router.replace("/(teacher)");
-      } else {
-        router.replace("/(student)");
-      }
+      if (user.role === "TEACHER") router.replace("/(teacher)");
+      else router.replace("/(student)");
     } catch (error: any) {
-      const message = error.response?.data?.message || "Email hoặc mật khẩu không chính xác";
-      setGeneralError(message);
+      setGeneralError(error.response?.data?.message || "Email hoặc mật khẩu không chính xác");
     } finally {
       setLoading(false);
     }
@@ -131,7 +216,7 @@ export default function LoginScreen() {
             </View>
             {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
 
-            <TouchableOpacity style={styles.forgotBtn}>
+            <TouchableOpacity style={styles.forgotBtn} onPress={() => router.push('/(auth)/forgot-password')}>
               <Text style={styles.forgotText}>Quên mật khẩu?</Text>
             </TouchableOpacity>
 
@@ -151,16 +236,34 @@ export default function LoginScreen() {
           <View style={styles.socialSection}>
             <Text style={styles.socialDividerText}>hoặc đăng nhập với</Text>
             <View style={styles.socialButtons}>
-              <TouchableOpacity style={styles.socialIconBtn}>
-                <Image source={{ uri: "https://cdn-icons-png.flaticon.com/512/2991/2991148.png" }} style={styles.socialIcon} />
+              <TouchableOpacity style={styles.socialIconBtn} onPress={() => void handleGoogleLogin()} disabled={socialLoading !== null}>
+                {socialLoading === "google" ? (
+                  <ActivityIndicator size="small" color="#2E7D32" />
+                ) : (
+                  <Image source={{ uri: "https://cdn-icons-png.flaticon.com/512/2991/2991148.png" }} style={styles.socialIcon} />
+                )}
                 <Text style={styles.socialLabel}>Google</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.socialIconBtn}>
-                <Image source={{ uri: "https://cdn-icons-png.flaticon.com/512/0/747.png" }} style={styles.socialIcon} />
-                <Text style={styles.socialLabel}>Apple</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialIconBtn}>
-                <Image source={{ uri: "https://cdn-icons-png.flaticon.com/512/124/124010.png" }} style={styles.socialIcon} />
+              {appleAvailable ? (
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE}
+                  cornerRadius={12}
+                  style={{ flex: 1, height: 80, marginHorizontal: 6 }}
+                  onPress={() => { if (socialLoading === null) void handleAppleLogin(); }}
+                />
+              ) : (
+                <TouchableOpacity style={styles.socialIconBtn} onPress={() => Alert.alert('Apple Sign In không khả dụng trên thiết bị này')} disabled>
+                  <Image source={{ uri: "https://cdn-icons-png.flaticon.com/512/179/179309.png" }} style={styles.socialIcon} />
+                  <Text style={styles.socialLabel}>Apple</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.socialIconBtn} onPress={() => void handleFacebookLogin()} disabled={socialLoading !== null}>
+                {socialLoading === "facebook" ? (
+                  <ActivityIndicator size="small" color="#1877F2" />
+                ) : (
+                  <Image source={{ uri: "https://cdn-icons-png.flaticon.com/512/124/124010.png" }} style={styles.socialIcon} />
+                )}
                 <Text style={styles.socialLabel}>Facebook</Text>
               </TouchableOpacity>
             </View>

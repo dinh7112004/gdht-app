@@ -21,7 +21,19 @@ export default function ClassroomScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchInitialData();
+      const loadWithCache = async () => {
+        try {
+          const cached = await AsyncStorage.getItem("student_classroom_cache");
+          if (cached) {
+            const data = JSON.parse(cached);
+            setRole(data.role || "STUDENT");
+            setClasses(data.classes || []);
+            setLoading(false);
+          }
+        } catch (_) {}
+        fetchInitialData();
+      };
+      void loadWithCache();
     }, [])
   );
 
@@ -31,7 +43,7 @@ export default function ClassroomScreen() {
       if (userDataStr) {
         const user = JSON.parse(userDataStr);
         setRole(user.role || "STUDENT");
-        await fetchClasses();
+        await fetchClasses(user.role || "STUDENT");
       }
     } catch (e) {
       console.error("Failed to fetch classroom data", e);
@@ -40,10 +52,16 @@ export default function ClassroomScreen() {
     }
   };
 
-  const fetchClasses = async () => {
+  const fetchClasses = async (currentRole?: string) => {
     try {
       const res = await client.get("/classes/my-classes");
       setClasses(res.data);
+      const userDataStr = await AsyncStorage.getItem("userData");
+      const user = userDataStr ? JSON.parse(userDataStr) : {};
+      await AsyncStorage.setItem("student_classroom_cache", JSON.stringify({
+        role: currentRole || user.role || "STUDENT",
+        classes: res.data,
+      }));
     } catch (e) {
       console.error("Failed to fetch classes", e);
     }

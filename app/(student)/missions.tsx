@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  SafeAreaView, 
-  ScrollView, 
-  TouchableOpacity, 
-  Image, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  Image,
   ActivityIndicator,
   FlatList,
   useWindowDimensions
@@ -14,6 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import client from "../../src/api/client";
 
 export default function MissionsScreen() {
@@ -33,20 +34,32 @@ export default function MissionsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchData();
+      const loadWithCache = async () => {
+        try {
+          const cached = await AsyncStorage.getItem("student_missions_cache");
+          if (cached) {
+            const data = JSON.parse(cached);
+            setUserData(data.userData);
+            setMissions(data.missions);
+            setLoading(false);
+          }
+        } catch (_) {}
+        fetchData();
+      };
+      void loadWithCache();
     }, [])
   );
 
   const fetchData = async () => {
     try {
-      setLoading(true);
       const [profileRes, missionsRes] = await Promise.all([
         client.get("/auth/profile"),
         client.get("/missions")
       ]);
-      
+
       setUserData(profileRes.data);
       setMissions(missionsRes.data);
+      await AsyncStorage.setItem("student_missions_cache", JSON.stringify({ userData: profileRes.data, missions: missionsRes.data }));
     } catch (e) {
       console.error("Failed to fetch missions", e);
     } finally {
