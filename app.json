@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/role_student.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "scheme": [
       "gdds-toanhoc",
       "com.googleusercontent.apps.1049087471983-5padaqumsq2i4vgm5td3nvbgadiockjl",
